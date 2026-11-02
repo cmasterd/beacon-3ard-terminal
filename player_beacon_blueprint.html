@@ -108,7 +108,7 @@
             <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
             <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
             <button id="sound-toggle" type="button" onclick="toggleSound()" class="self-center text-xs px-3 py-2 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold tracking-wider cursor-pointer">🔇 SOUND OFF</button>
-            <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/8)</span></a>
+            <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/11)</span></a>
         </div>
     </header>
 
@@ -242,7 +242,8 @@
         // ids lists only Warden-controlled logs; public logs (e.g. audio #6) never alert.
         const ARCHIVE_ALERTS = {
             audio: { key: 'vad_audio_archive_v1', notifiedKey: 'vad_audio_notified_v1', ids: [1, 2, 3, 4, 5], noun: 'audio log' },
-            video: { key: 'vad_video_archive_v1', notifiedKey: 'vad_video_notified_v1', ids: [1, 2, 3], noun: 'video log' }
+            video: { key: 'vad_video_archive_v1', notifiedKey: 'vad_video_notified_v1', ids: [1, 2, 3], noun: 'video log' },
+            text: { key: 'vad_text_archive_v1', notifiedKey: 'vad_text_notified_v1', ids: [1, 2, 3], noun: 'text log' }
         };
         let state = {};
         let activeRoom = 1;
@@ -442,7 +443,7 @@
                 msg = `${count} new ${ARCHIVE_ALERTS[kinds[0]].noun}s are now available in the archive.`;
             } else {
                 title = 'NEW LOGS UNLOCKED';
-                msg = `${count} new audio and video logs are now available in the archive.`;
+                msg = `${count} new logs are now available in the archive.`;
             }
 
             document.getElementById('audio-alert-title').textContent = title;

@@ -234,6 +234,21 @@
             </div>
             <div id="video-log-controls" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
         </div>
+
+        <div>
+            <div class="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-rose-900/60 pb-2 mb-3">
+                <div>
+                    <span class="text-xs font-bold text-rose-400 tracking-wider">TEXT ARCHIVE CONTROL</span>
+                    <span id="text-unlock-count" class="text-[10px] text-rose-700 font-mono ml-2">0 / 3 UNLOCKED</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a href="archive.html#text-logs" target="_blank" rel="noopener" class="text-[10px] px-2 py-1 bg-gray-950 border border-rose-800 text-rose-400 hover:bg-rose-950 rounded transition">OPEN ARCHIVE ↗</a>
+                    <button onclick="setAllLogs('text', true)" class="text-[10px] px-2 py-1 bg-emerald-950/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/60 rounded transition cursor-pointer">UNLOCK ALL</button>
+                    <button onclick="setAllLogs('text', false)" class="text-[10px] px-2 py-1 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer">RELOCK ALL</button>
+                </div>
+            </div>
+            <div id="text-log-controls" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+        </div>
     </section>
 
     <script>
@@ -257,6 +272,14 @@
                     { id: 1, code: "VIDEO-LOG #01", title: "[PLACEHOLDER VIDEO TITLE 01]" },
                     { id: 2, code: "VIDEO-LOG #02", title: "[PLACEHOLDER VIDEO TITLE 02]" },
                     { id: 3, code: "VIDEO-LOG #03", title: "[PLACEHOLDER VIDEO TITLE 03]" }
+                ]
+            },
+            text: {
+                key: 'vad_text_archive_v1',
+                logs: [
+                    { id: 1, code: "TEXT-LOG #01", title: "[PLACEHOLDER DOCUMENT TITLE 01]" },
+                    { id: 2, code: "TEXT-LOG #02", title: "[PLACEHOLDER DOCUMENT TITLE 02]" },
+                    { id: 3, code: "TEXT-LOG #03", title: "[PLACEHOLDER DOCUMENT TITLE 03]" }
                 ]
             }
         };
@@ -693,7 +716,7 @@
         function resetStation() {
             if (!confirm('Reset ALL station data, archive unlocks and broadcasts?')) return;
             resetAllState();
-            [ARCHIVE.audio.key, ARCHIVE.video.key, 'vad_audio_notified_v1', 'vad_video_notified_v1', BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY]
+            [ARCHIVE.audio.key, ARCHIVE.video.key, ARCHIVE.text.key, 'vad_audio_notified_v1', 'vad_video_notified_v1', 'vad_text_notified_v1', BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY]
                 .forEach(k => localStorage.removeItem(k));
             Object.keys(ARCHIVE).forEach(renderArchiveControls);
             renderBroadcastStatus();
