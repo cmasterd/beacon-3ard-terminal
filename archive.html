@@ -69,7 +69,7 @@
             <p class="text-sm text-cyan-600 font-mono mt-1">RECOVERED VOICE & VIDEO LOGS // ACCESS GRANTED BY STATION WARDEN</p>
         </div>
         <div class="flex flex-wrap items-center gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
-            <div><span class="text-cyan-700 block text-xs">LOGS UNLOCKED:</span><span id="archive-count" class="text-cyan-300 font-bold">AUDIO 0/6 · VIDEO 0/3</span></div>
+            <div><span class="text-cyan-700 block text-xs">LOGS UNLOCKED:</span><span id="archive-count" class="text-cyan-300 font-bold">AUDIO 0/5 · VIDEO 0/3</span></div>
             <a href="player_beacon_blueprint.html" class="text-xs px-3 py-1.5 bg-cyan-950 border border-cyan-500 text-cyan-300 hover:bg-cyan-900 rounded transition font-bold">← PLAYER TERMINAL</a>
             <a href="index.html" class="text-xs px-3 py-1.5 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold">GATEWAY</a>
         </div>
@@ -105,7 +105,7 @@
                     { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]", desc: "[Placeholder description for audio log 03.]", src: "audio/log-03.mp3" },
                     { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]", desc: "[Placeholder description for audio log 04.]", src: "audio/log-04.mp3" },
                     { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]", desc: "[Placeholder description for audio log 05.]", src: "audio/log-05.mp3" },
-                    { id: 6, code: "AUDIO-LOG #06", title: "Leaving Gateway", desc: "Recovered recording: Leaving Gateway.", src: "audio/welcome to the endless waltz_mixdown.mp3" }
+                    { id: 6, code: "AUDIO-LOG #06", title: "Leaving Gateway", desc: "Recovered recording: Leaving Gateway.", src: "audio/welcome to the endless waltz_mixdown.mp3", public: true }
                 ]
             },
             video: {
@@ -150,7 +150,7 @@
             list.replaceChildren();
 
             cfg.logs.forEach(log => {
-                const open = unlocked.includes(log.id);
+                const open = log.public || unlocked.includes(log.id);
                 const item = el('li', `rounded border p-4 md:p-5 ${open ? 'bg-gray-950/90 border-cyan-500/50' : 'bg-gray-950/60 border-zinc-800'}`);
 
                 const top = el('div', 'flex justify-between items-start gap-3 flex-wrap');
@@ -159,7 +159,7 @@
                     el('span', `text-xs tracking-[0.25em] block ${open ? 'text-cyan-600' : 'text-zinc-600'}`, log.code),
                     el('h3', `font-orbitron font-bold text-lg md:text-xl mt-1 ${open ? 'text-cyan-200' : 'text-zinc-600'}`, open ? log.title : `[ENCRYPTED ${cfg.label === 'VIDEO' ? 'FOOTAGE' : 'RECORDING'}]`)
                 );
-                top.append(heading, el('span', `text-[11px] px-2 py-0.5 rounded border ${open ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-gray-950 text-zinc-500 border-zinc-800'}`, open ? 'UNLOCKED' : 'LOCKED'));
+                top.append(heading, el('span', `text-[11px] px-2 py-0.5 rounded border ${open ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-gray-950 text-zinc-500 border-zinc-800'}`, open ? (log.public ? 'PUBLIC' : 'UNLOCKED') : 'LOCKED'));
                 item.append(top);
 
                 if (open) {
@@ -188,7 +188,7 @@
 
         function updateCount() {
             const parts = Object.keys(ARCHIVE).map(kind => {
-                const logs = ARCHIVE[kind].logs;
+                const logs = ARCHIVE[kind].logs.filter(l => !l.public);
                 const n = readUnlocked(kind).filter(id => logs.some(l => l.id === id)).length;
                 return `${ARCHIVE[kind].label} ${n}/${logs.length}`;
             });

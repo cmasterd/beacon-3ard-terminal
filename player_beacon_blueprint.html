@@ -92,7 +92,7 @@
         <div class="flex flex-wrap gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
             <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
             <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
-            <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/9)</span></a>
+            <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/8)</span></a>
         </div>
     </header>
 
@@ -223,9 +223,10 @@
         };
 
         const STORAGE_KEY = 'vad_shared_station_state_v14';
+        // ids lists only Warden-controlled logs; public logs (e.g. audio #6) never alert.
         const ARCHIVE_ALERTS = {
-            audio: { key: 'vad_audio_archive_v1', notifiedKey: 'vad_audio_notified_v1', total: 6, noun: 'audio log' },
-            video: { key: 'vad_video_archive_v1', notifiedKey: 'vad_video_notified_v1', total: 3, noun: 'video log' }
+            audio: { key: 'vad_audio_archive_v1', notifiedKey: 'vad_audio_notified_v1', ids: [1, 2, 3, 4, 5], noun: 'audio log' },
+            video: { key: 'vad_video_archive_v1', notifiedKey: 'vad_video_notified_v1', ids: [1, 2, 3], noun: 'video log' }
         };
         let state = {};
         let activeRoom = 1;
@@ -266,7 +267,7 @@
             let totalUnlocked = 0, totalLogs = 0;
 
             Object.entries(ARCHIVE_ALERTS).forEach(([kind, cfg]) => {
-                const unlocked = readIdList(cfg.key, 'unlocked');
+                const unlocked = readIdList(cfg.key, 'unlocked').filter(id => cfg.ids.includes(id));
                 const notified = readIdList(cfg.notifiedKey);
                 const added = unlocked.filter(id => !notified.includes(id));
                 const stillUnlocked = notified.filter(id => unlocked.includes(id));
@@ -276,7 +277,7 @@
                 }
                 if (added.length) fresh[kind] = added;
                 totalUnlocked += unlocked.length;
-                totalLogs += cfg.total;
+                totalLogs += cfg.ids.length;
             });
 
             document.getElementById('audio-header-count').textContent = `(${totalUnlocked}/${totalLogs})`;
