@@ -79,6 +79,11 @@
         </div>
     </div>
 
+    <div id="countdown-box" role="timer" class="fixed bottom-4 left-4 z-[60] hidden bg-black/95 border-2 border-red-500 rounded-lg shadow-2xl px-4 py-3 backdrop-blur">
+        <div id="countdown-label" class="text-xs text-red-500 tracking-[0.25em]"></div>
+        <div id="countdown-time" class="font-orbitron font-black text-4xl text-red-400 tracking-widest tabular-nums"></div>
+    </div>
+
     <div id="audio-alert" role="alert" aria-live="assertive" class="fixed bottom-4 right-4 left-4 md:left-auto md:w-[26rem] z-[60] hidden bg-black/95 border-2 border-amber-500 rounded-lg shadow-2xl p-4 backdrop-blur">
         <div class="flex justify-between items-start gap-3">
             <div>
@@ -102,6 +107,7 @@
         <div class="flex flex-wrap gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
             <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
             <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
+            <button id="sound-toggle" type="button" onclick="toggleSound()" class="self-center text-xs px-3 py-2 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold tracking-wider cursor-pointer">🔇 SOUND OFF</button>
             <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/8)</span></a>
         </div>
     </header>
@@ -250,6 +256,8 @@
             selectRoom(activeRoom);
             checkArchiveUnlocks();
             checkBroadcast();
+            checkCountdown();
+            renderSoundButton();
 
             setInterval(() => {
                 const currentStored = localStorage.getItem(STORAGE_KEY);
@@ -261,10 +269,100 @@
                 checkArchiveUnlocks();
                 checkBroadcast();
             }, 800);
+            setInterval(checkCountdown, 250);
         }
 
         const BROADCAST_KEY = 'vad_broadcast_v1';
         const BROADCAST_SEEN_KEY = 'vad_broadcast_seen_v1';
+        const COUNTDOWN_KEY = 'vad_countdown_v1';
+        const SOUND_KEY = 'vad_sound_v1';
+        let audioCtx = null;
+        let lastBroadcastSounded = null;
+        let expiredSounded = null;
+
+        // Browsers block audio until a user gesture, so the context is created on a click.
+        function soundEnabled() {
+            return localStorage.getItem(SOUND_KEY) === 'on';
+        }
+
+        function ensureAudio() {
+            if (!soundEnabled()) return null;
+            if (!audioCtx) {
+                const Ctx = window.AudioContext || window.webkitAudioContext;
+                if (!Ctx) return null;
+                audioCtx = new Ctx();
+            }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            return audioCtx;
+        }
+
+        function tone(freq, start, dur, type, vol) {
+            const ctx = audioCtx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            const t0 = ctx.currentTime + start;
+            gain.gain.setValueAtTime(0.0001, t0);
+            gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+            osc.connect(gain).connect(ctx.destination);
+            osc.start(t0);
+            osc.stop(t0 + dur + 0.05);
+        }
+
+        function playSound(kind) {
+            if (!ensureAudio() || audioCtx.state !== 'running') return;
+            if (kind === 'unlock') {
+                tone(660, 0, 0.18, 'sine', 0.25);
+                tone(990, 0.2, 0.3, 'sine', 0.25);
+            } else if (kind === 'alarm') {
+                for (let i = 0; i < 3; i++) {
+                    tone(880, i * 0.5, 0.22, 'square', 0.15);
+                    tone(620, i * 0.5 + 0.25, 0.22, 'square', 0.15);
+                }
+            } else if (kind === 'expired') {
+                for (let i = 0; i < 6; i++) tone(i % 2 ? 520 : 780, i * 0.35, 0.3, 'sawtooth', 0.18);
+            }
+        }
+
+        function renderSoundButton() {
+            const on = soundEnabled();
+            const btn = document.getElementById('sound-toggle');
+            btn.textContent = on ? '🔊 SOUND ON' : '🔇 SOUND OFF';
+            btn.setAttribute('aria-pressed', String(on));
+        }
+
+        function toggleSound() {
+            localStorage.setItem(SOUND_KEY, soundEnabled() ? 'off' : 'on');
+            renderSoundButton();
+            if (ensureAudio()) playSound('unlock');
+        }
+
+        // A saved "on" preference still needs one click on the page after each load.
+        ['pointerdown', 'keydown'].forEach(evt => document.addEventListener(evt, () => { ensureAudio(); }, { once: false }));
+
+        function checkCountdown() {
+            let c = null;
+            try { c = JSON.parse(localStorage.getItem(COUNTDOWN_KEY) || 'null'); } catch (e) {}
+            const box = document.getElementById('countdown-box');
+            if (!c || !c.id) {
+                box.classList.add('hidden');
+                return;
+            }
+            const left = Math.max(0, c.paused ? c.remainingMs : c.endsAt - Date.now());
+            const secs = Math.ceil(left / 1000);
+            const time = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
+            const timeEl = document.getElementById('countdown-time');
+            document.getElementById('countdown-label').textContent = left === 0 ? `${c.label} // TIME EXPIRED` : `${c.label}${c.paused ? ' // PAUSED' : ''}`;
+            timeEl.textContent = time;
+            timeEl.classList.toggle('animate-pulse', left === 0 || (!c.paused && secs <= 60));
+            box.classList.remove('hidden');
+            if (left === 0 && expiredSounded !== c.id) {
+                expiredSounded = c.id;
+                playSound('expired');
+            }
+        }
 
         function readBroadcast() {
             try {
@@ -285,6 +383,10 @@
             }
             document.getElementById('broadcast-alert-text').textContent = b.text;
             box.classList.remove('hidden');
+            if (lastBroadcastSounded !== b.id) {
+                lastBroadcastSounded = b.id;
+                playSound('alarm');
+            }
         }
 
         function dismissBroadcast() {
@@ -346,6 +448,7 @@
             document.getElementById('audio-alert-title').textContent = title;
             document.getElementById('audio-alert-msg').textContent = msg;
             document.getElementById('audio-alert').classList.remove('hidden');
+            playSound('unlock');
         }        function dismissAudioAlert() {
             document.getElementById('audio-alert').classList.add('hidden');
         }

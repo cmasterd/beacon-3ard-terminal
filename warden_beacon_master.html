@@ -187,6 +187,22 @@
         </div>
     </section>
 
+    <!-- COUNTDOWN -->
+    <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
+        <div class="flex justify-between items-center border-b border-rose-900/60 pb-2 mb-3">
+            <span class="text-xs font-bold text-rose-400 tracking-wider">COUNTDOWN TIMER</span>
+            <span id="countdown-status" class="text-[10px] text-rose-700 font-mono">NO ACTIVE COUNTDOWN</span>
+        </div>
+        <form id="countdown-form" class="flex flex-col md:flex-row gap-2">
+            <input id="countdown-label" type="text" maxlength="60" autocomplete="off" value="SELF-DESTRUCT" placeholder="Label" class="flex-grow bg-gray-950 border border-rose-900 text-rose-200 font-mono text-sm rounded px-3 py-2 focus:outline-none focus:border-rose-500">
+            <input id="countdown-minutes" type="number" min="0.5" step="0.5" value="10" aria-label="Minutes" class="w-28 bg-gray-950 border border-rose-900 text-rose-200 font-mono text-sm rounded px-3 py-2 focus:outline-none focus:border-rose-500">
+            <span class="self-center text-[10px] text-rose-700 font-mono">MIN</span>
+            <button type="submit" class="text-[11px] px-4 py-2 bg-red-950 hover:bg-red-900 border border-red-500 text-red-300 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">⏱ START</button>
+            <button id="countdown-pause" type="button" onclick="toggleCountdownPause()" class="text-[11px] px-4 py-2 bg-amber-950 hover:bg-amber-900 border border-amber-600 text-amber-300 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">PAUSE</button>
+            <button type="button" onclick="clearCountdown()" class="text-[11px] px-4 py-2 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">CLEAR</button>
+        </form>
+    </section>
+
     <!-- ARCHIVE CONTROL (AUDIO + VIDEO) -->
     <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg space-y-6">
         <div>
@@ -605,14 +621,83 @@
             el.className = `text-[10px] font-mono ${text ? 'text-red-400' : 'text-rose-700'}`;
         }
 
+        const COUNTDOWN_KEY = 'vad_countdown_v1';
+
+        function readCountdown() {
+            try {
+                const c = JSON.parse(localStorage.getItem(COUNTDOWN_KEY) || 'null');
+                return c && c.id ? c : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function countdownRemaining(c) {
+            return Math.max(0, c.paused ? c.remainingMs : c.endsAt - Date.now());
+        }
+
+        function formatClock(ms) {
+            const s = Math.ceil(ms / 1000);
+            return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+        }
+
+        function startCountdown(label, minutes) {
+            const ms = Math.round(minutes * 60000);
+            if (!(ms > 0)) return;
+            localStorage.setItem(COUNTDOWN_KEY, JSON.stringify({ id: Date.now(), label: label.trim() || 'COUNTDOWN', endsAt: Date.now() + ms, paused: false, remainingMs: ms }));
+            renderCountdownStatus();
+        }
+
+        function toggleCountdownPause() {
+            const c = readCountdown();
+            if (!c || countdownRemaining(c) === 0) return;
+            if (c.paused) {
+                c.endsAt = Date.now() + c.remainingMs;
+                c.paused = false;
+            } else {
+                c.remainingMs = countdownRemaining(c);
+                c.paused = true;
+            }
+            localStorage.setItem(COUNTDOWN_KEY, JSON.stringify(c));
+            renderCountdownStatus();
+        }
+
+        function clearCountdown() {
+            localStorage.removeItem(COUNTDOWN_KEY);
+            renderCountdownStatus();
+        }
+
+        function renderCountdownStatus() {
+            const c = readCountdown();
+            const el = document.getElementById('countdown-status');
+            const pauseBtn = document.getElementById('countdown-pause');
+            if (!c) {
+                el.textContent = 'NO ACTIVE COUNTDOWN';
+                el.className = 'text-[10px] font-mono text-rose-700';
+                pauseBtn.textContent = 'PAUSE';
+                return;
+            }
+            const left = countdownRemaining(c);
+            el.textContent = left === 0 ? `${c.label}: TIME EXPIRED` : `${c.label}: ${formatClock(left)}${c.paused ? ' (PAUSED)' : ''}`;
+            el.className = `text-[10px] font-mono ${left === 0 ? 'text-red-500 animate-pulse' : 'text-red-400'}`;
+            pauseBtn.textContent = c.paused ? 'RESUME' : 'PAUSE';
+        }
+
+        document.getElementById('countdown-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            startCountdown(document.getElementById('countdown-label').value, parseFloat(document.getElementById('countdown-minutes').value));
+        });
+        setInterval(renderCountdownStatus, 500);
+
         // Full reset: station state plus archive unlocks, alert memory and broadcasts.
         function resetStation() {
             if (!confirm('Reset ALL station data, archive unlocks and broadcasts?')) return;
             resetAllState();
-            [ARCHIVE.audio.key, ARCHIVE.video.key, 'vad_audio_notified_v1', 'vad_video_notified_v1', BROADCAST_KEY, BROADCAST_SEEN_KEY]
+            [ARCHIVE.audio.key, ARCHIVE.video.key, 'vad_audio_notified_v1', 'vad_video_notified_v1', BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY]
                 .forEach(k => localStorage.removeItem(k));
             Object.keys(ARCHIVE).forEach(renderArchiveControls);
             renderBroadcastStatus();
+            renderCountdownStatus();
         }
 
         document.getElementById('broadcast-form').addEventListener('submit', (e) => {
