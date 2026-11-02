@@ -123,6 +123,38 @@
             return node;
         }
 
+        const REVEALED_KEY = 'vad_text_revealed_v1';
+
+        function readRevealed() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(REVEALED_KEY) || '[]');
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        // Types a text log out the first time it is shown; later views and reduced-motion show it at once.
+        function revealText(pre, log) {
+            const seen = readRevealed();
+            const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (seen.includes(log.id) || reduced) {
+                pre.textContent = log.body;
+                return;
+            }
+            localStorage.setItem(REVEALED_KEY, JSON.stringify([...seen, log.id]));
+            pre.title = 'Click to skip';
+            let i = 0;
+            const step = Math.max(1, Math.ceil(log.body.length / 400));
+            const timer = setInterval(() => {
+                if (!pre.isConnected) { clearInterval(timer); return; }
+                i += step;
+                pre.textContent = log.body.slice(0, i);
+                if (i >= log.body.length) clearInterval(timer);
+            }, 25);
+            pre.addEventListener('click', () => { clearInterval(timer); pre.textContent = log.body; });
+        }
+
         function renderSection(kind) {
             const cfg = ARCHIVE[kind];
             const raw = localStorage.getItem(cfg.key) || '';
@@ -149,7 +181,9 @@
                 if (open) {
                     item.append(el('p', 'text-sm text-cyan-100/80 mt-3', log.desc));
                     if (kind === 'text') {
-                        item.append(el('pre', 'mt-4 p-3 bg-black/60 border border-cyan-900/60 rounded text-sm text-cyan-100 font-mono whitespace-pre-wrap break-words', log.body));
+                        const pre = el('pre', 'mt-4 p-3 bg-black/60 border border-cyan-900/60 rounded text-sm text-cyan-100 font-mono whitespace-pre-wrap break-words');
+                        revealText(pre, log);
+                        item.append(pre);
                     } else {
                         const media = el(kind === 'video' ? 'video' : 'audio');
                         media.controls = true;

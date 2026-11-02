@@ -125,6 +125,7 @@
             <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
             <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
             <button id="sound-toggle" type="button" onclick="toggleSound()" class="self-center text-xs px-3 py-2 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold tracking-wider cursor-pointer">🔇 SOUND OFF</button>
+            <button id="fullscreen-toggle" type="button" onclick="toggleFullscreen()" class="self-center text-xs px-3 py-2 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold tracking-wider cursor-pointer">⛶ FULLSCREEN (F)</button>
             <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/11)</span></a>
         </div>
     </header>
@@ -899,18 +900,21 @@
             if (keypadInput === correctCode) {
                 triggerHudPopup("ACCESS GRANTED", "SECURITY OVERRIDE AUTHORIZED", "success");
                 state[activeRoom].unlocked = true;
+                STATION.logEvent('PLAYER', `Keypad solved: sector ${activeRoom}`);
                 saveState();
                 updateGridVisuals();
                 showKeypadManual = false;
                 setTimeout(() => { selectRoom(activeRoom); }, 2100);
             } else {
                 triggerHudPopup("ACCESS DENIED", "SECURITY CODE MISMATCH", "error");
+                STATION.logEvent('PLAYER', `Wrong keypad code: sector ${activeRoom}`);
                 clearKeypad();
             }
         }
 
         function doExplore() {
             state[activeRoom].explored = true;
+            STATION.logEvent('PLAYER', `Explored sector ${activeRoom}`);
             saveState();
             updateGridVisuals();
             selectRoom(activeRoom);
@@ -918,6 +922,7 @@
 
         function doSearch() {
             state[activeRoom].searched = true;
+            STATION.logEvent('PLAYER', `Searched sector ${activeRoom}`);
             saveState();
             updateGridVisuals();
             selectRoom(activeRoom);
@@ -925,6 +930,7 @@
 
         function doLog() {
             state[activeRoom].logUnlocked = true;
+            STATION.logEvent('PLAYER', `Accessed data log: sector ${activeRoom}`);
             saveState();
             updateGridVisuals();
             selectRoom(activeRoom);
@@ -932,6 +938,7 @@
 
         function pickupEngine() {
             state[8].engineCollected = true;
+            STATION.logEvent('PLAYER', 'Sovereign Engine collected');
             saveState();
             updateGridVisuals();
             selectRoom(8);
@@ -946,16 +953,32 @@
             const status = STATION.readStatus();
             status.power = 100;
             STATION.writeStatus(status);
+            STATION.logEvent('PLAYER', 'Engine plugged in: Power 100%');
             updateGridVisuals();
             selectRoom(7);
             triggerHudPopup("POWER SURGE", "7B IS NOW UNLOCKED", "blue");
         }
 
+        function toggleFullscreen() {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) toggleFullscreen();
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            document.getElementById('fullscreen-toggle').textContent = document.fullscreenElement ? '⛶ EXIT FULLSCREEN (F)' : '⛶ FULLSCREEN (F)';
+        });
+
         function triggerEscape() {
+            STATION.logEvent('PLAYER', 'Chose: ESCAPE SHUTTLE LAUNCH');
             triggerEndgameScreen("SHUTTLE LAUNCH SUCCESSFUL", "You get into the escape shuttle and launch away from Beacon 3A-r3d. The Warden has taken over terminal control.", "success");
         }
 
         function triggerDestruct() {
+            STATION.logEvent('PLAYER', 'Chose: STATION PURGE');
             triggerEndgameScreen("STATION PURGE INITIATED", "You killed the mind-core and saved the human race. The Warden has taken over terminal control.", "error");
         }
 

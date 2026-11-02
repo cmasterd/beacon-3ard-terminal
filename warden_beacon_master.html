@@ -283,6 +283,43 @@
         </div>
     </section>
 
+    <!-- SESSION LOG + NOTES -->
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section class="bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
+            <div class="flex justify-between items-center border-b border-rose-900/60 pb-2 mb-3 gap-2 flex-wrap">
+                <span class="text-xs font-bold text-rose-400 tracking-wider">SESSION LOG</span>
+                <span class="flex gap-2">
+                    <button type="button" onclick="copySessionLog()" id="log-copy-btn" class="text-[10px] px-2 py-1 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 rounded cursor-pointer">COPY</button>
+                    <button type="button" onclick="clearSessionLog()" class="text-[10px] px-2 py-1 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 rounded cursor-pointer">CLEAR</button>
+                </span>
+            </div>
+            <ul id="session-log" class="h-64 overflow-y-auto space-y-1 font-mono text-xs text-rose-300"></ul>
+        </section>
+        <section class="bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
+            <div class="flex justify-between items-center border-b border-rose-900/60 pb-2 mb-3">
+                <span class="text-xs font-bold text-rose-400 tracking-wider">WARDEN NOTES</span>
+                <span class="flex gap-2 items-center">
+                    <span id="notes-status" class="text-[10px] text-rose-700 font-mono">AUTOSAVED</span>
+                    <button type="button" onclick="clearNotes()" class="text-[10px] px-2 py-1 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 rounded cursor-pointer">CLEAR</button>
+                </span>
+            </div>
+            <textarea id="warden-notes" aria-label="Warden notes" placeholder="NPC stats, reminders, what happens next..." class="w-full h-64 bg-gray-950 border border-rose-900 text-rose-200 font-mono text-sm rounded px-3 py-2 focus:outline-none focus:border-rose-500 resize-y"></textarea>
+        </section>
+    </div>
+
+    <!-- BACKUP -->
+    <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
+        <div class="flex justify-between items-center border-b border-rose-900/60 pb-2 mb-3 gap-2 flex-wrap">
+            <span class="text-xs font-bold text-rose-400 tracking-wider">BACKUP & RESTORE</span>
+            <span id="backup-status" class="text-[10px] text-rose-700 font-mono">SAVES PROGRESS, UNLOCKS, STATUS, LOG AND NOTES</span>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" onclick="exportBackup()" class="text-[11px] px-4 py-2 bg-amber-950 hover:bg-amber-900 border border-amber-600 text-amber-300 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">⬇ EXPORT</button>
+            <button type="button" onclick="document.getElementById('backup-file').click()" class="text-[11px] px-4 py-2 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">⬆ IMPORT</button>
+            <input id="backup-file" type="file" accept="application/json,.json" class="hidden">
+        </div>
+    </section>
+
     <script src="logs.js"></script>
     <script src="station.js"></script>
     <script>
@@ -609,6 +646,7 @@
 
         function toggleWardenUnlock() {
             state[activeRoom].unlocked = !state[activeRoom].unlocked;
+            STATION.logEvent('WARDEN', `Sector ${activeRoom} ${state[activeRoom].unlocked ? 'force-unlocked' : 'locked'}`);
             saveState();
             updateGridVisuals();
             selectRoom(activeRoom);
@@ -626,6 +664,7 @@
             } else if (flag === 'wardenAllow7bVis') {
                 state['7b'].wardenAllow7bVis = !state['7b'].wardenAllow7bVis;
             }
+            STATION.logEvent('WARDEN', `Toggled ${flag}`);
             saveState();
             updateGridVisuals();
             renderPanelContent();
@@ -638,11 +677,13 @@
             text = text.trim();
             if (!text) return;
             localStorage.setItem(BROADCAST_KEY, JSON.stringify({ id: Date.now(), text }));
+            STATION.logEvent('WARDEN', `Broadcast: ${text}`);
             renderBroadcastStatus();
         }
 
         function clearBroadcast() {
             localStorage.removeItem(BROADCAST_KEY);
+            STATION.logEvent('WARDEN', 'Broadcast cleared');
             renderBroadcastStatus();
         }
 
@@ -678,6 +719,7 @@
             const ms = Math.round(minutes * 60000);
             if (!(ms > 0)) return;
             localStorage.setItem(COUNTDOWN_KEY, JSON.stringify({ id: Date.now(), label: label.trim() || 'COUNTDOWN', endsAt: Date.now() + ms, paused: false, remainingMs: ms }));
+            STATION.logEvent('WARDEN', `Countdown started: ${label.trim() || 'COUNTDOWN'} (${formatClock(ms)})`);
             renderCountdownStatus();
         }
 
@@ -692,11 +734,13 @@
                 c.paused = true;
             }
             localStorage.setItem(COUNTDOWN_KEY, JSON.stringify(c));
+            STATION.logEvent('WARDEN', `Countdown ${c.paused ? 'paused' : 'resumed'} at ${formatClock(countdownRemaining(c))}`);
             renderCountdownStatus();
         }
 
         function clearCountdown() {
             localStorage.removeItem(COUNTDOWN_KEY);
+            STATION.logEvent('WARDEN', 'Countdown cleared');
             renderCountdownStatus();
         }
 
@@ -727,7 +771,9 @@
             if (!confirm('Reset ALL station data, archive unlocks and broadcasts?')) return;
             resetAllState();
             Object.values(ARCHIVE).forEach(cfg => { localStorage.removeItem(cfg.key); localStorage.removeItem(cfg.notifiedKey); });
-            [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY].forEach(k => localStorage.removeItem(k));
+            [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY, STATION.LOG_KEY, 'vad_text_revealed_v1'].forEach(k => localStorage.removeItem(k));
+            STATION.logEvent('WARDEN', 'Station reset');
+            renderSessionLog();
             STATION.applyHazards('warden-node');
             renderPanelContent();
             renderStatusControls();
@@ -761,10 +807,14 @@
 
         function toggleLog(kind, id) {
             const unlocked = readUnlocked(kind);
-            writeUnlocked(kind, unlocked.includes(id) ? unlocked.filter(x => x !== id) : [...unlocked, id]);
+            const opening = !unlocked.includes(id);
+            const log = ARCHIVE[kind].logs.find(l => l.id === id);
+            STATION.logEvent('WARDEN', `${opening ? 'Unlocked' : 'Locked'} ${log ? log.code : kind + ' ' + id}`);
+            writeUnlocked(kind, opening ? [...unlocked, id] : unlocked.filter(x => x !== id));
         }
 
         function setAllLogs(kind, unlock) {
+            STATION.logEvent('WARDEN', `${unlock ? 'Unlocked' : 'Locked'} all ${kind} logs`);
             writeUnlocked(kind, unlock ? ARCHIVE[kind].logs.map(l => l.id) : []);
         }
 
@@ -809,6 +859,7 @@
 
         function setRoomHazard(hazard) {
             STATION.setHazard(String(activeRoom), hazard);
+            STATION.logEvent('WARDEN', hazard ? `Hazard in sector ${activeRoom}: ${hazard}` : `Hazard cleared in sector ${activeRoom}`);
             STATION.applyHazards('warden-node');
         }
 
@@ -888,6 +939,7 @@
             const status = STATION.readStatus();
             Object.assign(status, STATUS_PRESETS[name]);
             STATION.writeStatus(status);
+            STATION.logEvent('WARDEN', `Status preset: ${name}`);
             renderStatusControls();
         }
 
@@ -895,11 +947,13 @@
             const status = STATION.readStatus();
             status[id] = Math.max(0, Math.min(100, Math.round(value)));
             STATION.writeStatus(status);
+            STATION.logEvent('WARDEN', `${id.toUpperCase()} set to ${status[id]}%`);
             renderStatusControls();
         }
 
         function resetShipStatus() {
             localStorage.removeItem(STATION.STATUS_KEY);
+            STATION.logEvent('WARDEN', 'Ship status reset to defaults');
             renderStatusControls();
         }
 
@@ -946,8 +1000,129 @@
             });
         }
 
+        let lastLogRaw = null;
+
+        function renderSessionLog() {
+            const raw = localStorage.getItem(STATION.LOG_KEY) || '';
+            if (raw === lastLogRaw) return;
+            lastLogRaw = raw;
+            const list = document.getElementById('session-log');
+            const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+            list.replaceChildren();
+            const entries = STATION.readLog();
+            if (!entries.length) {
+                const empty = document.createElement('li');
+                empty.className = 'text-rose-700';
+                empty.textContent = 'No events yet.';
+                list.append(empty);
+                return;
+            }
+            entries.forEach(e => {
+                const li = document.createElement('li');
+                const time = document.createElement('span');
+                time.className = 'text-rose-700';
+                time.textContent = new Date(e.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ';
+                const who = document.createElement('span');
+                who.className = e.s === 'PLAYER' ? 'text-cyan-400' : 'text-amber-400';
+                who.textContent = `[${e.s}] `;
+                li.append(time, who, document.createTextNode(e.m));
+                list.append(li);
+            });
+            if (atBottom) list.scrollTop = list.scrollHeight;
+        }
+
+        function clearSessionLog() {
+            if (!confirm('Clear the session log?')) return;
+            localStorage.removeItem(STATION.LOG_KEY);
+            renderSessionLog();
+        }
+
+        function copySessionLog() {
+            const text = STATION.readLog().map(e => `${new Date(e.t).toLocaleTimeString()} [${e.s}] ${e.m}`).join('\n');
+            const btn = document.getElementById('log-copy-btn');
+            const done = ok => { btn.textContent = ok ? 'COPIED' : 'COPY FAILED'; setTimeout(() => { btn.textContent = 'COPY'; }, 1500); };
+            if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => done(true), () => done(false));
+            else done(false);
+        }
+
+        let notesTimer = null;
+
+        function setupNotes() {
+            const box = document.getElementById('warden-notes');
+            const status = document.getElementById('notes-status');
+            box.value = localStorage.getItem(STATION.NOTES_KEY) || '';
+            box.addEventListener('input', () => {
+                status.textContent = 'SAVING...';
+                clearTimeout(notesTimer);
+                notesTimer = setTimeout(() => {
+                    localStorage.setItem(STATION.NOTES_KEY, box.value);
+                    status.textContent = 'AUTOSAVED';
+                }, 400);
+            });
+        }
+
+        function clearNotes() {
+            if (!confirm('Clear all Warden notes?')) return;
+            clearTimeout(notesTimer);
+            localStorage.removeItem(STATION.NOTES_KEY);
+            document.getElementById('warden-notes').value = '';
+            document.getElementById('notes-status').textContent = 'AUTOSAVED';
+        }
+
+        // Backups cover every vad_ key except the per-device sound preference.
+        const BACKUP_SKIP = ['vad_sound_v1'];
+
+        function backupKeys() {
+            return Object.keys(localStorage).filter(k => k.startsWith('vad_') && !BACKUP_SKIP.includes(k));
+        }
+
+        function exportBackup() {
+            const data = {};
+            backupKeys().forEach(k => { data[k] = localStorage.getItem(k); });
+            const payload = { app: 'beacon-3ard-terminal', version: 1, exportedAt: new Date().toISOString(), data };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `beacon-3ard-backup-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+            document.body.append(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            document.getElementById('backup-status').textContent = `EXPORTED ${Object.keys(data).length} ITEMS`;
+        }
+
+        function importBackup(file) {
+            const status = document.getElementById('backup-status');
+            const reader = new FileReader();
+            reader.onload = () => {
+                let payload;
+                try { payload = JSON.parse(reader.result); } catch (e) { payload = null; }
+                const data = payload && payload.app === 'beacon-3ard-terminal' && payload.data;
+                if (!data || typeof data !== 'object') {
+                    status.textContent = 'IMPORT FAILED: NOT A VALID BACKUP FILE';
+                    return;
+                }
+                const entries = Object.entries(data).filter(([k, v]) => k.startsWith('vad_') && !BACKUP_SKIP.includes(k) && typeof v === 'string');
+                if (!confirm(`Replace the current session with this backup (${entries.length} items)?`)) return;
+                backupKeys().forEach(k => localStorage.removeItem(k));
+                entries.forEach(([k, v]) => localStorage.setItem(k, v));
+                location.reload();
+            };
+            reader.onerror = () => { status.textContent = 'IMPORT FAILED: COULD NOT READ FILE'; };
+            reader.readAsText(file);
+        }
+
+        document.getElementById('backup-file').addEventListener('change', (e) => {
+            if (e.target.files[0]) importBackup(e.target.files[0]);
+            e.target.value = '';
+        });
+
         window.onload = () => {
             init();
+            setupNotes();
+            renderSessionLog();
+            setInterval(renderSessionLog, 800);
             Object.keys(STATUS_PRESETS).forEach(name => {
                 const b = document.createElement('button');
                 b.type = 'button';

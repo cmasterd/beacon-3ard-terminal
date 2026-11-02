@@ -46,6 +46,16 @@ The player terminal plays a short boot-up sequence once per browser tab (click o
 
 The player terminal has a **SOUND** button (header). When on, it plays a chime when a log unlocks, an alarm for broadcasts and a siren when the countdown expires. Browsers only allow audio after a click, so press the button (or click anywhere on the page) once after each page load. Browser storage is local to that browser profile; it is not synchronized between devices.
 
+The player terminal has a **FULLSCREEN** button (or press `F`) for a cleaner view on the second monitor.
+
+Text logs in the archive type themselves out the first time they are shown (click to skip); afterwards, and with "reduce motion", they appear at once.
+
+## Warden session log, notes and backup
+
+The Warden terminal records a timestamped **Session Log** of player actions (explore, search, keypad attempts, engine, escape, self-destruct) and Warden actions (broadcasts, unlocks, hazards, status changes, countdown, resets), with Copy and Clear buttons. A station reset clears the log. **Warden Notes** is a private scratchpad that autosaves and survives a station reset.
+
+**Backup & Restore** downloads all game state (progress, unlocks, status, hazards, log, notes) as a JSON file, and can restore it later; restoring replaces current state and reloads the page. Sound preference is not included.
+
 ## Warden access code
 
 The Warden terminal opens with a keypad. The code is `1337` (change `WARDEN_CODE` in `warden_beacon_master.html`). It stays unlocked for the rest of that browser tab. This is a client-side gate to keep players out of the GM view; anyone who reads the page source can see the code.
