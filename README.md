@@ -38,7 +38,7 @@ An emergency broadcast (typed or preset) appears as a red banner on the player t
 
 The Warden can start, pause, resume and clear a labelled countdown (for example "SELF-DESTRUCT"); the player terminal shows a live clock in the bottom-left and flags when time expires.
 
-The Warden has a **Ship Status Board** with Oxygen, Power, Hull and Comms sliders (0-100%, with -10/+10 buttons) and one-click presets (hull breach, power failure, life support failing, blackout, all clear). The player terminal shows them as a strip under the header: amber below 60%, red and pulsing below 30%. When a gauge drops below 25% the player terminal sounds the alarm and glitches the screen.
+The Warden has a **Ship Status Board** with Oxygen, Power, Hull and Comms sliders (0-100%, with -10/+10 buttons) and one-click presets (hull breach, power failure, life support failing, blackout, all clear). The player terminal shows them as a strip under the header: amber below 60%, red and pulsing below 30%. When a gauge drops below 25% the player terminal sounds the alarm and glitches the screen. Power and Comms start at 0% (Oxygen and Hull at 100%); plugging the Sovereign Engine into sector 07 sets Power to 100%, and the player's "Reset Blueprint" sets it back to 0%. "Reset to defaults" restores all four starting values.
 
 In a room's detail panel the Warden can set a **Sector Hazard** (vacuum, fire, radiation, toxic gas, xeno contact, power surge). That sector pulses red with a warning tag on both maps, and the player sees a hazard banner when viewing it. Players see the marker even for undiscovered sectors, so set hazards when you want them revealed.
 

@@ -4,10 +4,10 @@
     const STATUS_KEY = 'vad_ship_status_v1';
     const HAZARDS = ['VACUUM', 'FIRE', 'RADIATION', 'TOXIC GAS', 'XENO CONTACT', 'POWER SURGE'];
     const GAUGES = [
-        { id: 'oxygen', label: 'OXYGEN' },
-        { id: 'power', label: 'POWER' },
-        { id: 'hull', label: 'HULL' },
-        { id: 'comms', label: 'COMMS' }
+        { id: 'oxygen', label: 'OXYGEN', def: 100 },
+        { id: 'power', label: 'POWER', def: 0 },
+        { id: 'hull', label: 'HULL', def: 100 },
+        { id: 'comms', label: 'COMMS', def: 0 }
     ];
 
     function readJson(key) {
@@ -30,8 +30,8 @@
         const raw = readJson(STATUS_KEY);
         const out = {};
         GAUGES.forEach(g => {
-            const v = Number(raw[g.id]);
-            out[g.id] = Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : 100;
+            const v = raw[g.id] === undefined ? NaN : Number(raw[g.id]);
+            out[g.id] = Number.isFinite(v) ? Math.max(0, Math.min(100, Math.round(v))) : g.def;
         });
         return out;
     }

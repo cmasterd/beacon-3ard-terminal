@@ -943,6 +943,9 @@
             state['7b'].enginePowered = true;
             state['7b'].explored = true;
             saveState();
+            const status = STATION.readStatus();
+            status.power = 100;
+            STATION.writeStatus(status);
             updateGridVisuals();
             selectRoom(7);
             triggerHudPopup("POWER SURGE", "7B IS NOW UNLOCKED", "blue");
@@ -960,6 +963,9 @@
             const permanentEnd = document.getElementById('permanent-end-screen');
             permanentEnd.className = "fixed inset-0 bg-black/98 z-50 flex-col items-center justify-center p-6 border-8 backdrop-blur-lg hidden";
             resetState();
+            const status = STATION.readStatus();
+            status.power = 0;
+            STATION.writeStatus(status);
             updateGridVisuals();
             selectRoom(1);
         }
