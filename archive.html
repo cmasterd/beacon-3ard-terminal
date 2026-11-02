@@ -97,6 +97,20 @@
         VAD PERSONNEL NETWORK // BEACON 3A-R3D // AUDIO & VIDEO ARCHIVE
     </footer>
 
+    <div id="text-modal" class="hidden fixed inset-0 z-40 bg-black/80 items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="bg-gray-950 border-2 border-cyan-500/60 rounded w-full max-w-3xl max-h-[88vh] flex flex-col shadow-[0_0_40px_rgba(34,211,238,0.25)]">
+            <div class="flex justify-between items-start gap-3 p-4 border-b border-cyan-900/60">
+                <div>
+                    <span id="modal-code" class="text-xs tracking-[0.25em] text-cyan-600 block"></span>
+                    <h3 id="modal-title" class="font-orbitron font-bold text-lg md:text-xl text-cyan-200 mt-1"></h3>
+                    <p id="modal-desc" class="text-xs text-cyan-100/70 mt-2"></p>
+                </div>
+                <button id="modal-close" type="button" class="text-xs px-3 py-1.5 bg-gray-950 border border-cyan-600 text-cyan-300 hover:bg-cyan-950 rounded font-bold shrink-0">✕ CLOSE</button>
+            </div>
+            <pre id="modal-body" class="p-4 overflow-y-auto text-sm md:text-base text-cyan-100 font-mono whitespace-pre-wrap break-words cursor-pointer"></pre>
+        </div>
+    </div>
+
     <script src="logs.js"></script>
     <script>
         // Log content lives in logs.js (shared with the Warden and player pages).
@@ -134,26 +148,62 @@
             }
         }
 
-        // Types a text log out the first time it is shown; later views and reduced-motion show it at once.
+        let revealTimer = null;
+        let openTextId = null;
+
+        // Types a text log out the first time it is opened; later views and reduced-motion show it at once.
         function revealText(pre, log) {
+            clearInterval(revealTimer);
             const seen = readRevealed();
             const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             if (seen.includes(log.id) || reduced) {
                 pre.textContent = log.body;
+                pre.title = '';
                 return;
             }
             localStorage.setItem(REVEALED_KEY, JSON.stringify([...seen, log.id]));
             pre.title = 'Click to skip';
             let i = 0;
             const step = Math.max(1, Math.ceil(log.body.length / 400));
-            const timer = setInterval(() => {
-                if (!pre.isConnected) { clearInterval(timer); return; }
+            revealTimer = setInterval(() => {
                 i += step;
                 pre.textContent = log.body.slice(0, i);
-                if (i >= log.body.length) clearInterval(timer);
+                if (i >= log.body.length) clearInterval(revealTimer);
             }, 25);
-            pre.addEventListener('click', () => { clearInterval(timer); pre.textContent = log.body; });
         }
+
+        function openTextLog(log) {
+            openTextId = log.id;
+            document.getElementById('modal-code').textContent = log.code;
+            document.getElementById('modal-title').textContent = log.title;
+            document.getElementById('modal-desc').textContent = log.desc;
+            const pre = document.getElementById('modal-body');
+            pre.scrollTop = 0;
+            revealText(pre, log);
+            const modal = document.getElementById('text-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.getElementById('modal-close').focus();
+        }
+
+        function closeTextLog() {
+            clearInterval(revealTimer);
+            openTextId = null;
+            const modal = document.getElementById('text-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        document.getElementById('modal-close').addEventListener('click', closeTextLog);
+        document.getElementById('text-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'text-modal') closeTextLog();
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeTextLog(); });
+        document.getElementById('modal-body').addEventListener('click', () => {
+            if (openTextId === null) return;
+            clearInterval(revealTimer);
+            document.getElementById('modal-body').textContent = ARCHIVE.text.logs.find(l => l.id === openTextId).body;
+        });
 
         function renderSection(kind) {
             const cfg = ARCHIVE[kind];
@@ -181,9 +231,10 @@
                 if (open) {
                     item.append(el('p', 'text-sm text-cyan-100/80 mt-3', log.desc));
                     if (kind === 'text') {
-                        const pre = el('pre', 'mt-4 p-3 bg-black/60 border border-cyan-900/60 rounded text-sm text-cyan-100 font-mono whitespace-pre-wrap break-words');
-                        revealText(pre, log);
-                        item.append(pre);
+                        const btn = el('button', 'mt-4 text-sm px-4 py-2 bg-cyan-950 border border-cyan-500 text-cyan-300 hover:bg-cyan-900 rounded transition font-bold tracking-widest', '📄 OPEN DOCUMENT');
+                        btn.type = 'button';
+                        btn.addEventListener('click', () => openTextLog(log));
+                        item.append(btn);
                     } else {
                         const media = el(kind === 'video' ? 'video' : 'audio');
                         media.controls = true;

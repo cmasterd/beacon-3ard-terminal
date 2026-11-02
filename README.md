@@ -50,7 +50,7 @@ The player terminal has a **SOUND** button (header). When on, it plays a chime w
 
 The player terminal has a **FULLSCREEN** button (or press `F`) for a cleaner view on the second monitor.
 
-Text logs in the archive type themselves out the first time they are shown (click to skip); afterwards, and with "reduce motion", they appear at once.
+Unlocked text logs show an **Open Document** button on the archive page. It opens a popup (close with the button, `Esc` or a click outside) where the text types itself out the first time it is opened (click the text to skip); afterwards, and with "reduce motion", it appears at once.
 
 ## Warden session log, notes and backup
 
