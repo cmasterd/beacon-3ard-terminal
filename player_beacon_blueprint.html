@@ -69,6 +69,16 @@
         </div>
     </div>
 
+    <div id="broadcast-alert" role="alert" aria-live="assertive" class="fixed top-4 left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[40rem] z-[70] hidden bg-black/95 border-2 border-red-500 rounded-lg shadow-2xl p-4 backdrop-blur">
+        <div class="flex justify-between items-start gap-3">
+            <div>
+                <div class="text-xs text-red-500 tracking-[0.25em]">⚠ EMERGENCY BROADCAST</div>
+                <div id="broadcast-alert-text" class="font-orbitron font-black text-xl text-red-400 tracking-widest animate-pulse mt-1 break-words"></div>
+            </div>
+            <button type="button" onclick="dismissBroadcast()" aria-label="Dismiss broadcast" class="text-red-600 hover:text-red-300 font-bold text-lg leading-none cursor-pointer">✕</button>
+        </div>
+    </div>
+
     <div id="audio-alert" role="alert" aria-live="assertive" class="fixed bottom-4 right-4 left-4 md:left-auto md:w-[26rem] z-[60] hidden bg-black/95 border-2 border-amber-500 rounded-lg shadow-2xl p-4 backdrop-blur">
         <div class="flex justify-between items-start gap-3">
             <div>
@@ -239,6 +249,7 @@
             updateGridVisuals();
             selectRoom(activeRoom);
             checkArchiveUnlocks();
+            checkBroadcast();
 
             setInterval(() => {
                 const currentStored = localStorage.getItem(STORAGE_KEY);
@@ -248,7 +259,38 @@
                     renderPanelContent();
                 }
                 checkArchiveUnlocks();
+                checkBroadcast();
             }, 800);
+        }
+
+        const BROADCAST_KEY = 'vad_broadcast_v1';
+        const BROADCAST_SEEN_KEY = 'vad_broadcast_seen_v1';
+
+        function readBroadcast() {
+            try {
+                const b = JSON.parse(localStorage.getItem(BROADCAST_KEY) || 'null');
+                return b && b.id && b.text ? b : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // Shows each Warden broadcast until dismissed; hides it if the Warden clears it.
+        function checkBroadcast() {
+            const b = readBroadcast();
+            const box = document.getElementById('broadcast-alert');
+            if (!b || String(b.id) === localStorage.getItem(BROADCAST_SEEN_KEY)) {
+                box.classList.add('hidden');
+                return;
+            }
+            document.getElementById('broadcast-alert-text').textContent = b.text;
+            box.classList.remove('hidden');
+        }
+
+        function dismissBroadcast() {
+            const b = readBroadcast();
+            if (b) localStorage.setItem(BROADCAST_SEEN_KEY, String(b.id));
+            document.getElementById('broadcast-alert').classList.add('hidden');
         }
 
         function readIdList(key, field) {

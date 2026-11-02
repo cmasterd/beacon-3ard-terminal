@@ -72,7 +72,7 @@
         <section class="lg:col-span-7 xl:col-span-8 bg-black/90 border border-rose-600/40 rounded p-4 flex flex-col justify-between shadow-lg relative">
             <div class="flex justify-between items-center mb-2 border-b border-rose-900/60 pb-2">
                 <span class="text-xs font-bold text-rose-400 tracking-wider flex items-center gap-2">STATION SCHEMATIC (WARDEN VIEW)</span>
-                <button onclick="resetAllState()" class="text-[10px] px-2 py-1 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer">⚠️ RESET ALL STATION DATA</button>
+                <button onclick="resetStation()" class="text-[10px] px-2 py-1 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer">⚠️ RESET ALL STATION DATA</button>
             </div>
 
             <div class="relative w-full overflow-x-auto flex justify-center items-center py-4">
@@ -166,6 +166,26 @@
             </div>
         </section>
     </main>
+
+    <!-- BROADCAST -->
+    <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
+        <div class="flex justify-between items-center border-b border-rose-900/60 pb-2 mb-3">
+            <span class="text-xs font-bold text-rose-400 tracking-wider">EMERGENCY BROADCAST</span>
+            <span id="broadcast-status" class="text-[10px] text-rose-700 font-mono">NO ACTIVE BROADCAST</span>
+        </div>
+        <form id="broadcast-form" class="flex flex-col md:flex-row gap-2">
+            <input id="broadcast-text" type="text" maxlength="140" autocomplete="off" placeholder="e.g. HULL BREACH - DECK 3" class="flex-grow bg-gray-950 border border-rose-900 text-rose-200 font-mono text-sm rounded px-3 py-2 focus:outline-none focus:border-rose-500">
+            <button type="submit" class="text-[11px] px-4 py-2 bg-red-950 hover:bg-red-900 border border-red-500 text-red-300 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">📡 SEND TO PLAYERS</button>
+            <button type="button" onclick="clearBroadcast()" class="text-[11px] px-4 py-2 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 font-orbitron font-bold rounded tracking-widest transition cursor-pointer">CLEAR</button>
+        </form>
+        <div class="flex flex-wrap gap-2 mt-3">
+            <button type="button" data-preset="HULL BREACH DETECTED" class="broadcast-preset text-[10px] px-2 py-1 bg-gray-950 border border-rose-900 text-rose-300 hover:bg-rose-950 rounded cursor-pointer">HULL BREACH</button>
+            <button type="button" data-preset="REACTOR CRITICAL - EVACUATE" class="broadcast-preset text-[10px] px-2 py-1 bg-gray-950 border border-rose-900 text-rose-300 hover:bg-rose-950 rounded cursor-pointer">REACTOR CRITICAL</button>
+            <button type="button" data-preset="LIFE SUPPORT FAILING" class="broadcast-preset text-[10px] px-2 py-1 bg-gray-950 border border-rose-900 text-rose-300 hover:bg-rose-950 rounded cursor-pointer">LIFE SUPPORT</button>
+            <button type="button" data-preset="UNKNOWN LIFEFORM DETECTED" class="broadcast-preset text-[10px] px-2 py-1 bg-gray-950 border border-rose-900 text-rose-300 hover:bg-rose-950 rounded cursor-pointer">LIFEFORM</button>
+            <button type="button" data-preset="SELF-DESTRUCT SEQUENCE INITIATED" class="broadcast-preset text-[10px] px-2 py-1 bg-gray-950 border border-rose-900 text-rose-300 hover:bg-rose-950 rounded cursor-pointer">SELF-DESTRUCT</button>
+        </div>
+    </section>
 
     <!-- ARCHIVE CONTROL (AUDIO + VIDEO) -->
     <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg space-y-6">
@@ -562,6 +582,48 @@
             renderPanelContent();
         }
 
+        const BROADCAST_KEY = 'vad_broadcast_v1';
+        const BROADCAST_SEEN_KEY = 'vad_broadcast_seen_v1';
+
+        function sendBroadcast(text) {
+            text = text.trim();
+            if (!text) return;
+            localStorage.setItem(BROADCAST_KEY, JSON.stringify({ id: Date.now(), text }));
+            renderBroadcastStatus();
+        }
+
+        function clearBroadcast() {
+            localStorage.removeItem(BROADCAST_KEY);
+            renderBroadcastStatus();
+        }
+
+        function renderBroadcastStatus() {
+            let text = '';
+            try { text = (JSON.parse(localStorage.getItem(BROADCAST_KEY) || 'null') || {}).text || ''; } catch (e) {}
+            const el = document.getElementById('broadcast-status');
+            el.textContent = text ? `LIVE: ${text}` : 'NO ACTIVE BROADCAST';
+            el.className = `text-[10px] font-mono ${text ? 'text-red-400' : 'text-rose-700'}`;
+        }
+
+        // Full reset: station state plus archive unlocks, alert memory and broadcasts.
+        function resetStation() {
+            if (!confirm('Reset ALL station data, archive unlocks and broadcasts?')) return;
+            resetAllState();
+            [ARCHIVE.audio.key, ARCHIVE.video.key, 'vad_audio_notified_v1', 'vad_video_notified_v1', BROADCAST_KEY, BROADCAST_SEEN_KEY]
+                .forEach(k => localStorage.removeItem(k));
+            Object.keys(ARCHIVE).forEach(renderArchiveControls);
+            renderBroadcastStatus();
+        }
+
+        document.getElementById('broadcast-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('broadcast-text');
+            sendBroadcast(input.value);
+            input.value = '';
+        });
+        document.querySelectorAll('.broadcast-preset').forEach(btn =>
+            btn.addEventListener('click', () => sendBroadcast(btn.dataset.preset)));
+
         function readUnlocked(kind) {
             try {
                 const parsed = JSON.parse(localStorage.getItem(ARCHIVE[kind].key) || '{}');
@@ -627,6 +689,7 @@
         window.onload = () => {
             init();
             Object.keys(ARCHIVE).forEach(renderArchiveControls);
+            renderBroadcastStatus();
         };
     </script>
 </body>
