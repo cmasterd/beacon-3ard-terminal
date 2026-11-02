@@ -4,6 +4,7 @@
     const STATUS_KEY = 'vad_ship_status_v1';
     const LOG_KEY = 'vad_session_log_v1';
     const NOTES_KEY = 'vad_warden_notes_v1';
+    const FOCUS_KEY = 'vad_player_focus_v1';
     const HAZARDS = ['VACUUM', 'FIRE', 'RADIATION', 'TOXIC GAS', 'XENO CONTACT', 'POWER SURGE'];
     const GAUGES = [
         { id: 'oxygen', label: 'OXYGEN', def: 100 },
@@ -99,5 +100,5 @@
         }
     }
 
-    window.STATION = { HAZARD_KEY, STATUS_KEY, LOG_KEY, NOTES_KEY, HAZARDS, GAUGES, readHazards, readStatus, writeStatus, setHazard, applyHazards, logEvent, readLog };
+    window.STATION = { HAZARD_KEY, STATUS_KEY, LOG_KEY, NOTES_KEY, FOCUS_KEY, HAZARDS, GAUGES, readHazards, readStatus, writeStatus, setHazard, applyHazards, logEvent, readLog };
 })();

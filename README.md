@@ -52,6 +52,8 @@ The player terminal has a **FULLSCREEN** button (or press `F`) for a cleaner vie
 
 Unlocked text logs show an **Open Document** button on the archive page. It opens a popup (close with the button, `Esc` or a click outside) where the text types itself out the first time it is opened (click the text to skip); afterwards, and with "reduce motion", it appears at once.
 
+The Warden schematic also shows a live **players-here marker**: a pulsing cyan outline and "PLAYERS HERE" tag on whichever sector the player terminal currently has selected, with a "PLAYERS VIEWING" readout under the map. It updates about twice a second and is not cleared by a station reset.
+
 ## Warden session log, notes and backup
 
 The Warden terminal records a timestamped **Session Log** of player actions (explore, search, keypad attempts, engine, escape, self-destruct) and Warden actions (broadcasts, unlocks, hazards, status changes, countdown, resets), with Copy and Clear buttons. A station reset clears the log. **Warden Notes** is a private scratchpad that autosaves and survives a station reset.

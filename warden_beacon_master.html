@@ -39,6 +39,9 @@
             0% { top: 0%; }
             100% { top: 100%; }
         }
+        @keyframes focus-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+        .focus-pulse { animation: focus-pulse 1.4s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .focus-pulse { animation: none; } }
         .glow-red { text-shadow: 0 0 10px rgba(244, 63, 94, 0.7); }
         /* Larger text for the Warden; `body` raises specificity over the Tailwind CDN utilities. */
         body { font-size: 1.125rem; }
@@ -128,9 +131,14 @@
                     <g class="room-node" onclick="selectRoom(8)" id="warden-node-8"><rect x="440" y="500" width="220" height="60" rx="6" fill="#050203" stroke="#f59e0b" stroke-width="2" /><text x="550" y="527" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="warden-label-8">08. [KEYPAD LOCKED]</text><text x="550" y="545" fill="#d97706" font-size="10" text-anchor="middle" id="warden-sub-8">[LOCKED SECTOR]</text></g>
                     <g class="room-node" onclick="selectRoom(9)" id="warden-node-9"><rect x="140" y="620" width="220" height="60" rx="6" fill="#050203" stroke="#3f3f46" stroke-width="2" /><text x="250" y="647" fill="#71717a" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="warden-label-9">09. [UNEXPLORED]</text><text x="250" y="665" fill="#52525b" font-size="10" text-anchor="middle" id="warden-sub-9">[CLICK TO INSPECT]</text></g>
                     <g class="room-node" onclick="selectRoom(10)" id="warden-node-10"><rect x="440" y="620" width="220" height="60" rx="6" fill="#050203" stroke="#f59e0b" stroke-width="2" /><text x="550" y="647" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="warden-label-10">10. [KEYPAD LOCKED]</text><text x="550" y="665" fill="#d97706" font-size="10" text-anchor="middle" id="warden-sub-10">[LOCKED SECTOR]</text></g>
+                    <g id="player-focus" pointer-events="none" style="display:none">
+                        <rect id="player-focus-ring" rx="9" fill="rgba(34,211,238,0.08)" stroke="#22d3ee" stroke-width="3" stroke-dasharray="8 5" class="focus-pulse" />
+                        <rect id="player-focus-tag-bg" height="18" rx="3" fill="#083344" stroke="#22d3ee" stroke-width="1" />
+                        <text id="player-focus-tag" fill="#67e8f9" font-size="12" font-family="'Share Tech Mono'" font-weight="bold">👁 PLAYERS HERE</text>
+                    </g>
                 </svg>
             </div>
-            <div class="border-t border-rose-900/60 pt-2 flex justify-between text-xs text-rose-500"><span id="warden-exploration-progress">PLAYER SECTORS DISCOVERED: 1 / 10</span></div>
+            <div class="border-t border-rose-900/60 pt-2 flex justify-between text-xs text-rose-500"><span id="warden-exploration-progress">PLAYER SECTORS DISCOVERED: 1 / 10</span><span id="player-focus-label" class="text-cyan-300 font-bold">👁 PLAYERS VIEWING: --</span></div>
         </section>
 
         <!-- RIGHT: WARDEN DETAIL PANEL -->
@@ -1118,8 +1126,37 @@
             e.target.value = '';
         });
 
+        // Shows where the player terminal is currently looking, from the focus key the player page writes.
+        function renderPlayerFocus() {
+            const group = document.getElementById('player-focus');
+            const label = document.getElementById('player-focus-label');
+            let room = null;
+            try { room = (JSON.parse(localStorage.getItem(STATION.FOCUS_KEY)) || {}).room || null; } catch (e) { room = null; }
+            const node = room && document.getElementById(`warden-node-${room}`);
+            if (!node) {
+                group.style.display = 'none';
+                label.textContent = '👁 PLAYERS VIEWING: --';
+                return;
+            }
+            const r = node.querySelector('rect');
+            const x = Number(r.getAttribute('x')), y = Number(r.getAttribute('y'));
+            const w = Number(r.getAttribute('width')), h = Number(r.getAttribute('height'));
+            const ring = document.getElementById('player-focus-ring');
+            ring.setAttribute('x', x - 5); ring.setAttribute('y', y - 5);
+            ring.setAttribute('width', w + 10); ring.setAttribute('height', h + 10);
+            const tag = document.getElementById('player-focus-tag');
+            const bg = document.getElementById('player-focus-tag-bg');
+            const tagY = y < 30 ? y + h + 22 : y - 9;
+            tag.setAttribute('x', x + 6); tag.setAttribute('y', tagY);
+            bg.setAttribute('x', x); bg.setAttribute('y', tagY - 14); bg.setAttribute('width', 128);
+            group.style.display = '';
+            label.textContent = `👁 PLAYERS VIEWING: SECTOR ${room.toUpperCase()}`;
+        }
+
         window.onload = () => {
             init();
+            renderPlayerFocus();
+            setInterval(renderPlayerFocus, 500);
             setupNotes();
             renderSessionLog();
             setInterval(renderSessionLog, 800);

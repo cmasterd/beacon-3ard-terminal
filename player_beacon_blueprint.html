@@ -742,6 +742,7 @@
             }
 
             activeRoom = id;
+            localStorage.setItem(STATION.FOCUS_KEY, JSON.stringify({ room: String(id), t: Date.now() }));
             keypadInput = "";
             showKeypadManual = false;
             updateKeypadDisplay();
