@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
+        @keyframes locked-flicker { 0%, 92%, 100% { opacity: 1; } 94% { opacity: 0.3; } 96% { opacity: 0.8; } 98% { opacity: 0.2; } }
+        .locked-flicker { animation: locked-flicker 4s infinite; }
+        @media (prefers-reduced-motion: reduce) { .locked-flicker { animation: none; } }
         body {
             font-family: 'Share Tech Mono', monospace;
             background-color: #030712;
@@ -94,50 +97,13 @@
         VAD PERSONNEL NETWORK // BEACON 3A-R3D // AUDIO & VIDEO ARCHIVE
     </footer>
 
+    <script src="logs.js"></script>
     <script>
-        // Keep ids and titles in sync with ARCHIVE in warden_beacon_master.html.
-        // Replace the placeholder entries and src paths as real files become available.
-        const ARCHIVE = {
-            audio: {
-                key: 'vad_audio_archive_v1',
-                listId: 'audio-list',
-                label: 'AUDIO',
-                encrypted: 'RECORDING',
-                missing: 'AUDIO FILE NOT YET INSTALLED',
-                logs: [
-                    { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]", desc: "[Placeholder description for audio log 01.]", src: "audio/log-01.mp3" },
-                    { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]", desc: "[Placeholder description for audio log 02.]", src: "audio/log-02.mp3" },
-                    { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]", desc: "[Placeholder description for audio log 03.]", src: "audio/log-03.mp3" },
-                    { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]", desc: "[Placeholder description for audio log 04.]", src: "audio/log-04.mp3" },
-                    { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]", desc: "[Placeholder description for audio log 05.]", src: "audio/log-05.mp3" },
-                    { id: 6, code: "AUDIO-LOG #06", title: "Leaving Gateway", desc: "Recovered recording: Leaving Gateway.", src: "audio/welcome to the endless waltz_mixdown.mp3", public: true }
-                ]
-            },
-            video: {
-                key: 'vad_video_archive_v1',
-                listId: 'video-list',
-                label: 'VIDEO',
-                encrypted: 'FOOTAGE',
-                missing: 'VIDEO FILE NOT YET INSTALLED',
-                logs: [
-                    { id: 1, code: "VIDEO-LOG #01", title: "[PLACEHOLDER VIDEO TITLE 01]", desc: "[Placeholder description for video log 01.]", src: "video/log-01.mp4" },
-                    { id: 2, code: "VIDEO-LOG #02", title: "[PLACEHOLDER VIDEO TITLE 02]", desc: "[Placeholder description for video log 02.]", src: "video/log-02.mp4" },
-                    { id: 3, code: "VIDEO-LOG #03", title: "[PLACEHOLDER VIDEO TITLE 03]", desc: "[Placeholder description for video log 03.]", src: "video/log-03.mp4" }
-                ]
-            },
-            // Text logs have no media file; "body" is shown as-is (line breaks preserved).
-            text: {
-                key: 'vad_text_archive_v1',
-                listId: 'text-list',
-                label: 'TEXT',
-                encrypted: 'DOCUMENT',
-                logs: [
-                    { id: 1, code: "TEXT-LOG #01", title: "[PLACEHOLDER DOCUMENT TITLE 01]", desc: "[Placeholder summary for text log 01.]", body: "FROM: [SENDER]\nTO: [RECIPIENT]\nSUBJECT: [SUBJECT]\n\n[Placeholder body text for text log 01.]" },
-                    { id: 2, code: "TEXT-LOG #02", title: "[PLACEHOLDER DOCUMENT TITLE 02]", desc: "[Placeholder summary for text log 02.]", body: "[Placeholder body text for text log 02.]" },
-                    { id: 3, code: "TEXT-LOG #03", title: "[PLACEHOLDER DOCUMENT TITLE 03]", desc: "[Placeholder summary for text log 03.]", body: "[Placeholder body text for text log 03.]" }
-                ]
-            }
-        };
+        // Log content lives in logs.js (shared with the Warden and player pages).
+        const ARCHIVE = {};
+        Object.entries(window.ARCHIVE_LOGS).forEach(([kind, cfg]) => {
+            ARCHIVE[kind] = { ...cfg, listId: `${kind}-list` };
+        });
 
         const lastSerialized = {};
 
@@ -175,7 +141,7 @@
                 const heading = el('div');
                 heading.append(
                     el('span', `text-xs tracking-[0.25em] block ${open ? 'text-cyan-600' : 'text-zinc-600'}`, log.code),
-                    el('h3', `font-orbitron font-bold text-lg md:text-xl mt-1 ${open ? 'text-cyan-200' : 'text-zinc-600'}`, open ? log.title : `[ENCRYPTED ${cfg.encrypted}]`)
+                    el('h3', `font-orbitron font-bold text-lg md:text-xl mt-1 ${open ? 'text-cyan-200' : 'text-zinc-600 locked-flicker'}`, open ? log.title : `[ENCRYPTED ${cfg.encrypted}]`)
                 );
                 top.append(heading, el('span', `text-[11px] px-2 py-0.5 rounded border ${open ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-gray-950 text-zinc-500 border-zinc-800'}`, open ? (log.public ? 'PUBLIC' : 'UNLOCKED') : 'LOCKED'));
                 item.append(top);

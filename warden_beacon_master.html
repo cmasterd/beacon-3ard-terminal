@@ -153,6 +153,9 @@
 
                 <!-- DEDICATED ACTION / OVERRIDE CONTROLS -->
                 <div class="my-4 flex flex-col gap-2">
+                    <label class="flex items-center gap-2 text-[11px] text-rose-400 font-mono">SECTOR HAZARD
+                        <select id="hazard-select" onchange="setRoomHazard(this.value)" class="flex-grow bg-gray-950 border border-rose-900 text-rose-200 font-mono text-xs rounded px-2 py-1.5 focus:outline-none focus:border-rose-500"></select>
+                    </label>
                     <button id="btn-force-unlock" onclick="toggleWardenUnlock()" class="w-full py-2 bg-amber-950 hover:bg-amber-900 border border-amber-500 text-amber-300 font-orbitron text-xs font-bold rounded tracking-widest transition shadow-lg cursor-pointer hidden">🔓 FORCE UNLOCK SECTOR</button>
                     <button id="btn-toggle-pickup" onclick="toggleWardenFlag('wardenAllowPickup')" class="w-full py-2 bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-300 font-orbitron text-xs font-bold rounded tracking-widest transition shadow-lg cursor-pointer hidden">📦 ALLOW ENGINE PICKUP (SEC 08)</button>
                     <button id="btn-toggle-plug" onclick="toggleWardenFlag('wardenAllowPlug')" class="w-full py-2 bg-blue-950 hover:bg-blue-900 border border-blue-500 text-blue-300 font-orbitron text-xs font-bold rounded tracking-widest transition shadow-lg cursor-pointer hidden">⚡ ALLOW ENGINE PLUG (SEC 07)</button>
@@ -203,6 +206,15 @@
         </form>
     </section>
 
+    <!-- SHIP STATUS -->
+    <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
+        <div class="flex justify-between items-center border-b border-rose-900/60 pb-2 mb-3">
+            <span class="text-xs font-bold text-rose-400 tracking-wider">SHIP STATUS BOARD</span>
+            <button type="button" onclick="resetShipStatus()" class="text-[10px] px-2 py-1 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 rounded cursor-pointer">RESTORE ALL TO 100%</button>
+        </div>
+        <div id="status-controls" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </section>
+
     <!-- ARCHIVE CONTROL (AUDIO + VIDEO) -->
     <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg space-y-6">
         <div>
@@ -251,38 +263,16 @@
         </div>
     </section>
 
+    <script src="logs.js"></script>
+    <script src="station.js"></script>
     <script>
         const STORAGE_KEY = 'vad_shared_station_state_v14';
 
-        // Keep titles and ids in sync with the log lists in archive.html.
-        const ARCHIVE = {
-            audio: {
-                key: 'vad_audio_archive_v1',
-                logs: [
-                    { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]" },
-                    { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]" },
-                    { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]" },
-                    { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]" },
-                    { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]" }
-                ]
-            },
-            video: {
-                key: 'vad_video_archive_v1',
-                logs: [
-                    { id: 1, code: "VIDEO-LOG #01", title: "[PLACEHOLDER VIDEO TITLE 01]" },
-                    { id: 2, code: "VIDEO-LOG #02", title: "[PLACEHOLDER VIDEO TITLE 02]" },
-                    { id: 3, code: "VIDEO-LOG #03", title: "[PLACEHOLDER VIDEO TITLE 03]" }
-                ]
-            },
-            text: {
-                key: 'vad_text_archive_v1',
-                logs: [
-                    { id: 1, code: "TEXT-LOG #01", title: "[PLACEHOLDER DOCUMENT TITLE 01]" },
-                    { id: 2, code: "TEXT-LOG #02", title: "[PLACEHOLDER DOCUMENT TITLE 02]" },
-                    { id: 3, code: "TEXT-LOG #03", title: "[PLACEHOLDER DOCUMENT TITLE 03]" }
-                ]
-            }
-        };
+        // Log content lives in logs.js; public logs have no Warden control.
+        const ARCHIVE = {};
+        Object.entries(window.ARCHIVE_LOGS).forEach(([kind, cfg]) => {
+            ARCHIVE[kind] = { key: cfg.key, notifiedKey: cfg.notifiedKey, logs: cfg.logs.filter(l => !l.public) };
+        });
         let state = {};
         let activeRoom = 1;
         let lastSerializedState = "";
@@ -506,7 +496,7 @@
             document.getElementById('warden-detail-number').innerText = `SECTOR ID: ${activeRoom}`;
             document.getElementById('warden-detail-name').innerText = data.name;
             document.getElementById('warden-detail-env').innerText = data.env;
-            
+            renderHazardSelect();
             document.getElementById('warden-badge-exp').className = `text-[10px] px-2 py-0.5 rounded ${st.explored ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-gray-950 text-gray-600 border border-gray-800'}`;
             document.getElementById('warden-badge-exp').innerText = st.explored ? 'EXPLORED' : 'UNEXPLORED';
 
@@ -716,8 +706,11 @@
         function resetStation() {
             if (!confirm('Reset ALL station data, archive unlocks and broadcasts?')) return;
             resetAllState();
-            [ARCHIVE.audio.key, ARCHIVE.video.key, ARCHIVE.text.key, 'vad_audio_notified_v1', 'vad_video_notified_v1', 'vad_text_notified_v1', BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY]
-                .forEach(k => localStorage.removeItem(k));
+            Object.values(ARCHIVE).forEach(cfg => { localStorage.removeItem(cfg.key); localStorage.removeItem(cfg.notifiedKey); });
+            [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY].forEach(k => localStorage.removeItem(k));
+            STATION.applyHazards('warden-node');
+            renderPanelContent();
+            renderStatusControls();
             Object.keys(ARCHIVE).forEach(renderArchiveControls);
             renderBroadcastStatus();
             renderCountdownStatus();
@@ -794,8 +787,79 @@
             });
         });
 
+        function setRoomHazard(hazard) {
+            STATION.setHazard(String(activeRoom), hazard);
+            STATION.applyHazards('warden-node');
+        }
+
+        function renderHazardSelect() {
+            const select = document.getElementById('hazard-select');
+            if (!select.options.length) {
+                select.add(new Option('NONE', ''));
+                STATION.HAZARDS.forEach(h => select.add(new Option(h, h)));
+            }
+            select.value = STATION.readHazards()[String(activeRoom)] || '';
+        }
+
+        function setGauge(id, value) {
+            const status = STATION.readStatus();
+            status[id] = Math.max(0, Math.min(100, Math.round(value)));
+            STATION.writeStatus(status);
+            renderStatusControls();
+        }
+
+        function resetShipStatus() {
+            localStorage.removeItem(STATION.STATUS_KEY);
+            renderStatusControls();
+        }
+
+        function renderStatusControls() {
+            const wrapper = document.getElementById('status-controls');
+            const status = STATION.readStatus();
+            wrapper.replaceChildren();
+            STATION.GAUGES.forEach(g => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-2 p-2 bg-gray-900/50 border border-rose-950 rounded';
+
+                const label = document.createElement('span');
+                label.className = 'w-20 text-[11px] text-rose-300 font-mono font-bold';
+                label.textContent = g.label;
+
+                const minus = document.createElement('button');
+                minus.type = 'button';
+                minus.textContent = '-10';
+                minus.className = 'text-[10px] px-2 py-1 bg-gray-950 border border-rose-800 text-rose-400 hover:bg-rose-950 rounded cursor-pointer';
+                minus.addEventListener('click', () => setGauge(g.id, status[g.id] - 10));
+
+                const slider = document.createElement('input');
+                slider.type = 'range';
+                slider.min = '0';
+                slider.max = '100';
+                slider.value = status[g.id];
+                slider.setAttribute('aria-label', g.label);
+                slider.className = 'flex-grow accent-rose-500';
+                slider.addEventListener('change', () => setGauge(g.id, Number(slider.value)));
+
+                const plus = document.createElement('button');
+                plus.type = 'button';
+                plus.textContent = '+10';
+                plus.className = minus.className;
+                plus.addEventListener('click', () => setGauge(g.id, status[g.id] + 10));
+
+                const value = document.createElement('span');
+                value.className = 'w-12 text-right text-xs text-amber-400 font-mono';
+                value.textContent = status[g.id] + '%';
+                slider.addEventListener('input', () => { value.textContent = slider.value + '%'; });
+
+                row.append(label, minus, slider, plus, value);
+                wrapper.append(row);
+            });
+        }
+
         window.onload = () => {
             init();
+            renderStatusControls();
+            STATION.applyHazards('warden-node');
             Object.keys(ARCHIVE).forEach(renderArchiveControls);
             renderBroadcastStatus();
         };
