@@ -69,6 +69,18 @@
         </div>
     </div>
 
+    <div id="audio-alert" role="alert" aria-live="assertive" class="fixed bottom-4 right-4 left-4 md:left-auto md:w-[26rem] z-[60] hidden bg-black/95 border-2 border-amber-500 rounded-lg shadow-2xl p-4 backdrop-blur">
+        <div class="flex justify-between items-start gap-3">
+            <div>
+                <div class="text-xs text-amber-600 tracking-[0.25em]">INCOMING TRANSMISSION</div>
+                <div id="audio-alert-title" class="font-orbitron font-black text-lg text-amber-400 tracking-widest animate-pulse mt-1">AUDIO LOG UNLOCKED</div>
+            </div>
+            <button type="button" onclick="dismissAudioAlert()" aria-label="Dismiss alert" class="text-amber-600 hover:text-amber-300 font-bold text-lg leading-none cursor-pointer">✕</button>
+        </div>
+        <p id="audio-alert-msg" class="text-sm text-amber-200 font-mono mt-2"></p>
+        <a href="audio_archive.html" class="mt-3 block text-center py-2.5 bg-amber-950 hover:bg-amber-900 border border-amber-500 text-amber-300 font-orbitron text-xs font-bold rounded tracking-widest transition cursor-pointer">🎧 OPEN AUDIO ARCHIVE</a>
+    </div>
+
     <header class="border-b-2 border-cyan-500/40 pb-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-950/80 p-4 rounded backdrop-blur">
         <div>
             <div class="flex items-center gap-3">
@@ -80,6 +92,7 @@
         <div class="flex flex-wrap gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
             <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
             <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
+            <a href="audio_archive.html" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 AUDIO ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/5)</span></a>
         </div>
     </header>
 
@@ -210,6 +223,9 @@
         };
 
         const STORAGE_KEY = 'vad_shared_station_state_v14';
+        const AUDIO_STORAGE_KEY = 'vad_audio_archive_v1';
+        const AUDIO_NOTIFIED_KEY = 'vad_audio_notified_v1';
+        const AUDIO_LOG_COUNT = 5;
         let state = {};
         let activeRoom = 1;
         let keypadInput = "";
@@ -220,6 +236,7 @@
             loadState();
             updateGridVisuals();
             selectRoom(activeRoom);
+            checkAudioUnlocks();
 
             setInterval(() => {
                 const currentStored = localStorage.getItem(STORAGE_KEY);
@@ -228,7 +245,46 @@
                     updateGridVisuals();
                     renderPanelContent();
                 }
+                checkAudioUnlocks();
             }, 800);
+        }
+
+        function readIdList(key, field) {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+                const list = field ? (parsed && parsed[field]) : parsed;
+                return Array.isArray(list) ? list : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        // Alerts once per unlock; relocking a log clears it so a later re-unlock alerts again.
+        function checkAudioUnlocks() {
+            const unlocked = readIdList(AUDIO_STORAGE_KEY, 'unlocked');
+            const notified = readIdList(AUDIO_NOTIFIED_KEY);
+            const fresh = unlocked.filter(id => !notified.includes(id));
+            const stillUnlocked = notified.filter(id => unlocked.includes(id));
+
+            if (fresh.length || stillUnlocked.length !== notified.length) {
+                localStorage.setItem(AUDIO_NOTIFIED_KEY, JSON.stringify([...stillUnlocked, ...fresh]));
+            }
+
+            document.getElementById('audio-header-count').textContent = `(${unlocked.length}/${AUDIO_LOG_COUNT})`;
+            if (fresh.length) showAudioAlert(fresh);
+        }
+
+        function showAudioAlert(ids) {
+            const many = ids.length > 1;
+            document.getElementById('audio-alert-title').textContent = many ? 'AUDIO LOGS UNLOCKED' : 'AUDIO LOG UNLOCKED';
+            document.getElementById('audio-alert-msg').textContent = many
+                ? `${ids.length} new recordings are now available in the audio archive.`
+                : `Recording #${String(ids[0]).padStart(2, '0')} is now available in the audio archive.`;
+            document.getElementById('audio-alert').classList.remove('hidden');
+        }
+
+        function dismissAudioAlert() {
+            document.getElementById('audio-alert').classList.add('hidden');
         }
 
         function loadState() {
