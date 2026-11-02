@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUDIO ARCHIVE // BEACON 3A-R3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #030712;
+            color: #22d3ee;
+            background-image:
+                radial-gradient(rgba(14, 116, 144, 0.15) 1px, transparent 0),
+                linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px, 12px 12px, 12px 12px;
+        }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .scanline {
+            width: 100%;
+            height: 4px;
+            background: rgba(34, 211, 238, 0.2);
+            opacity: 0.75;
+            position: absolute;
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+        .glow-text { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+        audio { width: 100%; filter: invert(0.9) hue-rotate(150deg); }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #030712; }
+        ::-webkit-scrollbar-thumb { background: #0e7490; }
+    </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen flex flex-col relative text-base md:text-lg">
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
+
+    <header class="border-b-2 border-cyan-500/40 pb-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-950/80 p-4 rounded backdrop-blur relative z-10">
+        <div>
+            <div class="flex items-center gap-3">
+                <span class="inline-block w-3.5 h-3.5 bg-cyan-400 animate-pulse rounded-full" aria-hidden="true"></span>
+                <h1 class="text-2xl md:text-4xl font-orbitron font-black tracking-widest text-cyan-400 glow-text">AUDIO ARCHIVE // BEACON 3A-R3D</h1>
+            </div>
+            <p class="text-sm text-cyan-600 font-mono mt-1">RECOVERED VOICE LOGS // ACCESS GRANTED BY STATION WARDEN</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
+            <div><span class="text-cyan-700 block text-xs">LOGS UNLOCKED:</span><span id="archive-count" class="text-cyan-300 font-bold">0 / 5</span></div>
+            <a href="index.html" class="text-xs px-3 py-1.5 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold">← GATEWAY</a>
+        </div>
+    </header>
+
+    <main class="flex-grow relative z-10 max-w-4xl w-full mx-auto">
+        <ul id="archive-list" class="space-y-4"></ul>
+    </main>
+
+    <footer class="relative z-10 border-t border-cyan-900/60 mt-6 pt-4 text-center text-xs text-cyan-900 tracking-widest">
+        VAD PERSONNEL NETWORK // BEACON 3A-R3D // AUDIO ARCHIVE
+    </footer>
+
+    <script>
+        const AUDIO_STORAGE_KEY = 'vad_audio_archive_v1';
+
+        // Keep in sync with AUDIO_LOGS in warden_beacon_master.html. Replace each src with the real audio file.
+        const AUDIO_LOGS = [
+            { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]", desc: "[Placeholder description for audio log 01.]", src: "audio/log-01.mp3" },
+            { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]", desc: "[Placeholder description for audio log 02.]", src: "audio/log-02.mp3" },
+            { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]", desc: "[Placeholder description for audio log 03.]", src: "audio/log-03.mp3" },
+            { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]", desc: "[Placeholder description for audio log 04.]", src: "audio/log-04.mp3" },
+            { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]", desc: "[Placeholder description for audio log 05.]", src: "audio/log-05.mp3" }
+        ];
+
+        let lastSerialized = null;
+
+        function readUnlocked() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(AUDIO_STORAGE_KEY) || '{}');
+                return Array.isArray(parsed.unlocked) ? parsed.unlocked : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function el(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text !== undefined) node.textContent = text;
+            return node;
+        }
+
+        function renderArchive() {
+            const raw = localStorage.getItem(AUDIO_STORAGE_KEY) || '';
+            if (raw === lastSerialized) return;
+            lastSerialized = raw;
+
+            const unlocked = readUnlocked();
+            const list = document.getElementById('archive-list');
+            list.replaceChildren();
+
+            AUDIO_LOGS.forEach(log => {
+                const open = unlocked.includes(log.id);
+                const item = el('li', `rounded border p-4 md:p-5 ${open ? 'bg-gray-950/90 border-cyan-500/50' : 'bg-gray-950/60 border-zinc-800'}`);
+
+                const top = el('div', 'flex justify-between items-start gap-3 flex-wrap');
+                const heading = el('div');
+                heading.append(
+                    el('span', `text-xs tracking-[0.25em] block ${open ? 'text-cyan-600' : 'text-zinc-600'}`, log.code),
+                    el('h2', `font-orbitron font-bold text-lg md:text-xl mt-1 ${open ? 'text-cyan-200' : 'text-zinc-600'}`, open ? log.title : '[ENCRYPTED RECORDING]')
+                );
+                top.append(heading, el('span', `text-[11px] px-2 py-0.5 rounded border ${open ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-gray-950 text-zinc-500 border-zinc-800'}`, open ? 'UNLOCKED' : 'LOCKED'));
+                item.append(top);
+
+                if (open) {
+                    item.append(el('p', 'text-sm text-cyan-100/80 mt-3', log.desc));
+                    const player = el('audio');
+                    player.controls = true;
+                    player.preload = 'none';
+                    player.src = log.src;
+                    const note = el('p', 'text-xs text-amber-400 mt-3 hidden', '[ PLACEHOLDER // AUDIO FILE NOT YET INSTALLED ]');
+                    player.addEventListener('error', () => {
+                        player.classList.add('hidden');
+                        note.classList.remove('hidden');
+                    });
+                    const wrap = el('div', 'mt-4');
+                    wrap.append(player, note);
+                    item.append(wrap);
+                } else {
+                    item.append(el('p', 'text-sm text-zinc-600 mt-3', 'ACCESS RESTRICTED // AWAITING WARDEN AUTHORIZATION'));
+                }
+                list.append(item);
+            });
+
+            document.getElementById('archive-count').textContent = `${unlocked.filter(id => AUDIO_LOGS.some(l => l.id === id)).length} / ${AUDIO_LOGS.length}`;
+        }
+
+        renderArchive();
+        window.addEventListener('storage', renderArchive);
+        setInterval(renderArchive, 800);
+    </script>
+</body>
+</html>
