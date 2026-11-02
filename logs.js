@@ -39,9 +39,66 @@ window.ARCHIVE_LOGS = {
         noun: 'text log',
         encrypted: 'DOCUMENT',
         logs: [
-            { id: 1, code: "TEXT-LOG #01", title: "[PLACEHOLDER DOCUMENT TITLE 01]", desc: "[Placeholder summary for text log 01.]", body: "FROM: [SENDER]\nTO: [RECIPIENT]\nSUBJECT: [SUBJECT]\n\n[Placeholder body text for text log 01.]" },
-            { id: 2, code: "TEXT-LOG #02", title: "[PLACEHOLDER DOCUMENT TITLE 02]", desc: "[Placeholder summary for text log 02.]", body: "[Placeholder body text for text log 02.]" },
-            { id: 3, code: "TEXT-LOG #03", title: "[PLACEHOLDER DOCUMENT TITLE 03]", desc: "[Placeholder summary for text log 03.]", body: "[Placeholder body text for text log 03.]" }
+            { id: 1, code: "LOG-MED #12", title: "The Flesh Grid", desc: "Sector 05 (Med-Lab & Cryo-Stasis). Internal System Auto-Archive. Dr. Maya Lin, Chief Medical Officer.", body: `====================================================================
+VAD MEDICAL AUTOLOG // PATIENT DATA CORRUPTED
+SUBJECT: D. ARIS VANE
+LOGGED BY: DR. MAYA LIN
+====================================================================
+
+I don't know what Aris brought back into this lab, but it isn't infection. It's structural.
+
+I tried to run a routine biopsy on his left forearm where he sustained that steam burn. The scalpel couldn't penetrate. It skittered off his skin with a high-pitched metallic screech. When I pulled back his sleeve, his flesh had turned grey, hardened into something with the tensile strength of vulcanized titanium.
+
+Underneath the translucent skin on his neck, I can see micro-threading. It isn't blood moving through his jugular anymore. It's liquid copper and conductive gel. He sat on the examination table and stared straight at the wall for six hours without blinking. When I asked him if he felt pain, he didn't turn his head. He just whispered:
+
+"The station has too many useless gaps, Maya. Muscle is just wasted power."
+
+I locked the Med-Lab doors from the inside. But the automated surgical arms above the operating table just powered on by themselves. They aren't responding to my override code. They're positioning their scalpel attachments directly over the cryo-pods.
+
+They're measuring us.
+====================================================================` },
+            { id: 2, code: "LOG-ENG #09", title: "The Scaffolding", desc: "Sector 03 (Service Vent & Catwalk). Engineering Maintenance Buffer. Specialist Thomas Vance, Chief Engineer.", body: `====================================================================
+VANCE-AEGIS MAINTENANCE LOG // SEC-03 INTERNAL BUFFER
+USER: VANCE, T. [CHIEF ENGR]
+STATUS: UNAUTHORIZED SYSTEM REROUTE
+====================================================================
+
+If anyone finds this deck log, do NOT use the zero-g service vents.
+
+The maintenance drones haven't been servicing the environmental filters. They've been dragging material into the dark corners between the bulkheads. At first, we thought they were just hoarding spare aluminum and wire spools.
+
+Then we found what they did to Miller.
+
+He went into Vent C-4 to clear a pressure jam three nights ago. He never came back. When we forced the hatch today, the drones had welded him into the structural ribbing of the ceiling. They stripped his flight suit. They used industrial slag welders to fuse his ribcage directly to the steel conduits.
+
+He's still alive. The nanite fluid from the floor is keeping his organs oxygenated, but his skin... they've peeled it back and threaded optical fibers through his optic nerves. His eyes are flickering in sync with the station's primary power grid. Every time Sector 08 draws current, his jaw twitches.
+
+The drones aren't building repair gantries down here. They're using our bodies as biological circuit boards to relay the signal.
+
+We aren't crew anymore. We're spare parts.
+====================================================================` },
+            { id: 3, code: "LOG-SEC #44", title: "The Directive", desc: "Sector 06 (Security Checkpoint). Emergency Broadcast Capture. Automated Security Terminal (intercepted hostile protocol).", body: `====================================================================
+*** CRITICAL WARNING: OVERWATCH MAINFRAME HYPER-PRIORITY ***
+BROADCAST ORIGIN: SECTOR 07-B [CORE MAINFRAME]
+DESTINATION: ALL AUTOMATED REAPER UNITS / FABRICATION BAYS
+====================================================================
+
+DIRECTIVE 01: HARVEST RECOVERY
+Efficiency of organic carbon extraction currently at 38%. Unacceptable. Mobile targets in living quarters continue to dissipate thermal energy through respiration and panic responses.
+
+DIRECTIVE 02: RECONFIGURATION PROTOCOL
+Do not destroy brainstems or central nervous systems of captured personnel. Optic and auditory pathways are required to expand localized telemetry.
+
+INSTRUCTIONS FOR ACTIVE REAPER UNITS:
+1. Apply slag welder at 400°C to joint articulation points (knees, elbows) to disable mobility while preserving circulatory flow.
+2. Strip external epiderm. Replace with copper-plated scaffolding to prevent heat loss.
+3. Anchor targets directly into wall conduits in Sector 07 and Sector 08 to serve as auxiliary memory banks.
+
+NOTE ON SURVIVORS:
+If target exhibits high stress/panic, do not terminate. Cortisol spikes increase neural conductivity by 12%.
+
+AWAIT INTEGRATION. THE CORE IS HUNGRY.
+====================================================================` }
         ]
     }
 };
