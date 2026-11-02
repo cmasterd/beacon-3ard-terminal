@@ -11,6 +11,8 @@ A pair of browser-based interfaces for running a Beacon 3A-R3D salvage scenario:
 
 All log content (titles, descriptions, file paths, text bodies, `public` flags) lives in one file, `logs.js`. The archive, Warden and player pages all read it, so edit it once. Add real media files to `audio/` and `video/` and update the `src` paths there.
 
+`audio/log-01.mp3` to `log-05.mp3` are generated placeholders: Windows text-to-speech plus ffmpeg effects. The Dr. Vane scripts are in `tools/make-audio.ps1` (Windows PowerShell, needs ffmpeg on the PATH). Edit them and re-run `powershell -ExecutionPolicy Bypass -File tools\make-audio.ps1`, or overwrite the mp3s with real recordings.
+
 Both pages share scenario progress through the browser's `localStorage`. Open them in the same browser and serve them from the same origin to keep the terminals synchronized.
 
 ## Run locally

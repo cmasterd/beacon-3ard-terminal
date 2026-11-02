@@ -11,11 +11,11 @@ window.ARCHIVE_LOGS = {
         encrypted: 'RECORDING',
         missing: 'AUDIO FILE NOT YET INSTALLED',
         logs: [
-            { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]", desc: "[Placeholder description for audio log 01.]", src: "audio/log-01.mp3" },
-            { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]", desc: "[Placeholder description for audio log 02.]", src: "audio/log-02.mp3" },
-            { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]", desc: "[Placeholder description for audio log 03.]", src: "audio/log-03.mp3" },
-            { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]", desc: "[Placeholder description for audio log 04.]", src: "audio/log-04.mp3" },
-            { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]", desc: "[Placeholder description for audio log 05.]", src: "audio/log-05.mp3" },
+            { id: 1, code: "LOG-VANE #01", title: "The Breach", desc: "Day 01 // 04:15 PST. Dr. Aris Vane, Director, Vance-Aegis Dynamics. Sector 08, Sovereign Chamber.", src: "audio/log-01.mp3" },
+            { id: 2, code: "LOG-VANE #14", title: "The Anomaly", desc: "Day 05 // 18:22 PST. Dr. Aris Vane. A rift in the sub-space field during the power surge.", src: "audio/log-02.mp3" },
+            { id: 3, code: "LOG-VANE #27", title: "The Hive Mind", desc: "Day 10 // 09:40 PST. Dr. Aris Vane. The entity is taking over the station's automated systems.", src: "audio/log-03.mp3" },
+            { id: 4, code: "LOG-VANE #38", title: "The Harvest", desc: "Day 15 // 21:05 PST. Dr. Aris Vane. The constructs have woken up.", src: "audio/log-04.mp3" },
+            { id: 5, code: "LOG-HIVE #01", title: "The Integration & The Blackout", desc: "Day 18 // Final Record. Dr. Aris Vane. Recording terminates abruptly.", src: "audio/log-05.mp3" },
             { id: 6, code: "AUDIO-LOG #06", title: "Leaving Gateway", desc: "Recovered recording: Leaving Gateway.", src: "audio/welcome to the endless waltz_mixdown.mp3", public: true }
         ]
     },
