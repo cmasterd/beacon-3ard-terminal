@@ -78,7 +78,7 @@
             <button type="button" onclick="dismissAudioAlert()" aria-label="Dismiss alert" class="text-amber-600 hover:text-amber-300 font-bold text-lg leading-none cursor-pointer">✕</button>
         </div>
         <p id="audio-alert-msg" class="text-sm text-amber-200 font-mono mt-2"></p>
-        <a href="audio_archive.html" class="mt-3 block text-center py-2.5 bg-amber-950 hover:bg-amber-900 border border-amber-500 text-amber-300 font-orbitron text-xs font-bold rounded tracking-widest transition cursor-pointer">🎧 OPEN AUDIO ARCHIVE</a>
+        <a href="archive.html" target="_blank" rel="noopener" class="mt-3 block text-center py-2.5 bg-amber-950 hover:bg-amber-900 border border-amber-500 text-amber-300 font-orbitron text-xs font-bold rounded tracking-widest transition cursor-pointer">🎧 OPEN ARCHIVE</a>
     </div>
 
     <header class="border-b-2 border-cyan-500/40 pb-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-950/80 p-4 rounded backdrop-blur">
@@ -92,7 +92,7 @@
         <div class="flex flex-wrap gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
             <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
             <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
-            <a href="audio_archive.html" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 AUDIO ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/5)</span></a>
+            <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/9)</span></a>
         </div>
     </header>
 
@@ -223,9 +223,10 @@
         };
 
         const STORAGE_KEY = 'vad_shared_station_state_v14';
-        const AUDIO_STORAGE_KEY = 'vad_audio_archive_v1';
-        const AUDIO_NOTIFIED_KEY = 'vad_audio_notified_v1';
-        const AUDIO_LOG_COUNT = 5;
+        const ARCHIVE_ALERTS = {
+            audio: { key: 'vad_audio_archive_v1', notifiedKey: 'vad_audio_notified_v1', total: 6, noun: 'audio log' },
+            video: { key: 'vad_video_archive_v1', notifiedKey: 'vad_video_notified_v1', total: 3, noun: 'video log' }
+        };
         let state = {};
         let activeRoom = 1;
         let keypadInput = "";
@@ -236,7 +237,7 @@
             loadState();
             updateGridVisuals();
             selectRoom(activeRoom);
-            checkAudioUnlocks();
+            checkArchiveUnlocks();
 
             setInterval(() => {
                 const currentStored = localStorage.getItem(STORAGE_KEY);
@@ -245,7 +246,7 @@
                     updateGridVisuals();
                     renderPanelContent();
                 }
-                checkAudioUnlocks();
+                checkArchiveUnlocks();
             }, 800);
         }
 
@@ -260,30 +261,49 @@
         }
 
         // Alerts once per unlock; relocking a log clears it so a later re-unlock alerts again.
-        function checkAudioUnlocks() {
-            const unlocked = readIdList(AUDIO_STORAGE_KEY, 'unlocked');
-            const notified = readIdList(AUDIO_NOTIFIED_KEY);
-            const fresh = unlocked.filter(id => !notified.includes(id));
-            const stillUnlocked = notified.filter(id => unlocked.includes(id));
+        function checkArchiveUnlocks() {
+            const fresh = {};
+            let totalUnlocked = 0, totalLogs = 0;
 
-            if (fresh.length || stillUnlocked.length !== notified.length) {
-                localStorage.setItem(AUDIO_NOTIFIED_KEY, JSON.stringify([...stillUnlocked, ...fresh]));
+            Object.entries(ARCHIVE_ALERTS).forEach(([kind, cfg]) => {
+                const unlocked = readIdList(cfg.key, 'unlocked');
+                const notified = readIdList(cfg.notifiedKey);
+                const added = unlocked.filter(id => !notified.includes(id));
+                const stillUnlocked = notified.filter(id => unlocked.includes(id));
+
+                if (added.length || stillUnlocked.length !== notified.length) {
+                    localStorage.setItem(cfg.notifiedKey, JSON.stringify([...stillUnlocked, ...added]));
+                }
+                if (added.length) fresh[kind] = added;
+                totalUnlocked += unlocked.length;
+                totalLogs += cfg.total;
+            });
+
+            document.getElementById('audio-header-count').textContent = `(${totalUnlocked}/${totalLogs})`;
+            if (Object.keys(fresh).length) showArchiveAlert(fresh);
+        }
+
+        function showArchiveAlert(fresh) {
+            const kinds = Object.keys(fresh);
+            const count = kinds.reduce((n, kind) => n + fresh[kind].length, 0);
+            let title, msg;
+
+            if (kinds.length === 1 && count === 1) {
+                const kind = kinds[0];
+                title = `${kind.toUpperCase()} LOG UNLOCKED`;
+                msg = `${ARCHIVE_ALERTS[kind].noun.replace(/^./, c => c.toUpperCase())} #${String(fresh[kind][0]).padStart(2, '0')} is now available in the archive.`;
+            } else if (kinds.length === 1) {
+                title = `${kinds[0].toUpperCase()} LOGS UNLOCKED`;
+                msg = `${count} new ${ARCHIVE_ALERTS[kinds[0]].noun}s are now available in the archive.`;
+            } else {
+                title = 'NEW LOGS UNLOCKED';
+                msg = `${count} new audio and video logs are now available in the archive.`;
             }
 
-            document.getElementById('audio-header-count').textContent = `(${unlocked.length}/${AUDIO_LOG_COUNT})`;
-            if (fresh.length) showAudioAlert(fresh);
-        }
-
-        function showAudioAlert(ids) {
-            const many = ids.length > 1;
-            document.getElementById('audio-alert-title').textContent = many ? 'AUDIO LOGS UNLOCKED' : 'AUDIO LOG UNLOCKED';
-            document.getElementById('audio-alert-msg').textContent = many
-                ? `${ids.length} new recordings are now available in the audio archive.`
-                : `Recording #${String(ids[0]).padStart(2, '0')} is now available in the audio archive.`;
+            document.getElementById('audio-alert-title').textContent = title;
+            document.getElementById('audio-alert-msg').textContent = msg;
             document.getElementById('audio-alert').classList.remove('hidden');
-        }
-
-        function dismissAudioAlert() {
+        }        function dismissAudioAlert() {
             document.getElementById('audio-alert').classList.add('hidden');
         }
 

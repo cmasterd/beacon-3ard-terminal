@@ -167,34 +167,64 @@
         </section>
     </main>
 
-    <!-- AUDIO ARCHIVE CONTROL -->
-    <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg">
-        <div class="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-rose-900/60 pb-2 mb-3">
-            <div>
-                <span class="text-xs font-bold text-rose-400 tracking-wider">AUDIO ARCHIVE CONTROL</span>
-                <span id="audio-unlock-count" class="text-[10px] text-rose-700 font-mono ml-2">0 / 5 UNLOCKED</span>
+    <!-- ARCHIVE CONTROL (AUDIO + VIDEO) -->
+    <section class="mt-6 bg-black/90 border border-rose-600/40 rounded p-4 shadow-lg space-y-6">
+        <div>
+            <div class="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-rose-900/60 pb-2 mb-3">
+                <div>
+                    <span class="text-xs font-bold text-rose-400 tracking-wider">AUDIO ARCHIVE CONTROL</span>
+                    <span id="audio-unlock-count" class="text-[10px] text-rose-700 font-mono ml-2">0 / 6 UNLOCKED</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a href="archive.html" target="_blank" rel="noopener" class="text-[10px] px-2 py-1 bg-gray-950 border border-rose-800 text-rose-400 hover:bg-rose-950 rounded transition">OPEN ARCHIVE ↗</a>
+                    <button onclick="setAllLogs('audio', true)" class="text-[10px] px-2 py-1 bg-emerald-950/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/60 rounded transition cursor-pointer">UNLOCK ALL</button>
+                    <button onclick="setAllLogs('audio', false)" class="text-[10px] px-2 py-1 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer">RELOCK ALL</button>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <a href="audio_archive.html" target="_blank" rel="noopener" class="text-[10px] px-2 py-1 bg-gray-950 border border-rose-800 text-rose-400 hover:bg-rose-950 rounded transition">OPEN ARCHIVE ↗</a>
-                <button onclick="setAllAudioLogs(true)" class="text-[10px] px-2 py-1 bg-emerald-950/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/60 rounded transition cursor-pointer">UNLOCK ALL</button>
-                <button onclick="setAllAudioLogs(false)" class="text-[10px] px-2 py-1 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer">RELOCK ALL</button>
-            </div>
+            <div id="audio-log-controls" class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3"></div>
         </div>
-        <div id="audio-log-controls" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3"></div>
+
+        <div>
+            <div class="flex flex-col md:flex-row justify-between md:items-center gap-3 border-b border-rose-900/60 pb-2 mb-3">
+                <div>
+                    <span class="text-xs font-bold text-rose-400 tracking-wider">VIDEO ARCHIVE CONTROL</span>
+                    <span id="video-unlock-count" class="text-[10px] text-rose-700 font-mono ml-2">0 / 3 UNLOCKED</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a href="archive.html#video-logs" target="_blank" rel="noopener" class="text-[10px] px-2 py-1 bg-gray-950 border border-rose-800 text-rose-400 hover:bg-rose-950 rounded transition">OPEN ARCHIVE ↗</a>
+                    <button onclick="setAllLogs('video', true)" class="text-[10px] px-2 py-1 bg-emerald-950/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/60 rounded transition cursor-pointer">UNLOCK ALL</button>
+                    <button onclick="setAllLogs('video', false)" class="text-[10px] px-2 py-1 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer">RELOCK ALL</button>
+                </div>
+            </div>
+            <div id="video-log-controls" class="grid grid-cols-1 md:grid-cols-3 gap-3"></div>
+        </div>
     </section>
 
     <script>
         const STORAGE_KEY = 'vad_shared_station_state_v14';
-        const AUDIO_STORAGE_KEY = 'vad_audio_archive_v1';
 
-        // Keep in sync with AUDIO_LOGS in audio_archive.html.
-        const AUDIO_LOGS = [
-            { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]" },
-            { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]" },
-            { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]" },
-            { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]" },
-            { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]" }
-        ];
+        // Keep titles and ids in sync with the log lists in archive.html.
+        const ARCHIVE = {
+            audio: {
+                key: 'vad_audio_archive_v1',
+                logs: [
+                    { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]" },
+                    { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]" },
+                    { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]" },
+                    { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]" },
+                    { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]" },
+                    { id: 6, code: "AUDIO-LOG #06", title: "Leaving Gateway" }
+                ]
+            },
+            video: {
+                key: 'vad_video_archive_v1',
+                logs: [
+                    { id: 1, code: "VIDEO-LOG #01", title: "[PLACEHOLDER VIDEO TITLE 01]" },
+                    { id: 2, code: "VIDEO-LOG #02", title: "[PLACEHOLDER VIDEO TITLE 02]" },
+                    { id: 3, code: "VIDEO-LOG #03", title: "[PLACEHOLDER VIDEO TITLE 03]" }
+                ]
+            }
+        };
         let state = {};
         let activeRoom = 1;
         let lastSerializedState = "";
@@ -533,35 +563,36 @@
             renderPanelContent();
         }
 
-        function readAudioUnlocked() {
+        function readUnlocked(kind) {
             try {
-                const parsed = JSON.parse(localStorage.getItem(AUDIO_STORAGE_KEY) || '{}');
+                const parsed = JSON.parse(localStorage.getItem(ARCHIVE[kind].key) || '{}');
                 return Array.isArray(parsed.unlocked) ? parsed.unlocked : [];
             } catch (e) {
                 return [];
             }
         }
 
-        function writeAudioUnlocked(ids) {
-            localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify({ unlocked: ids }));
-            renderAudioControls();
+        function writeUnlocked(kind, ids) {
+            localStorage.setItem(ARCHIVE[kind].key, JSON.stringify({ unlocked: ids }));
+            renderArchiveControls(kind);
         }
 
-        function toggleAudioLog(id) {
-            const unlocked = readAudioUnlocked();
-            writeAudioUnlocked(unlocked.includes(id) ? unlocked.filter(x => x !== id) : [...unlocked, id]);
+        function toggleLog(kind, id) {
+            const unlocked = readUnlocked(kind);
+            writeUnlocked(kind, unlocked.includes(id) ? unlocked.filter(x => x !== id) : [...unlocked, id]);
         }
 
-        function setAllAudioLogs(unlock) {
-            writeAudioUnlocked(unlock ? AUDIO_LOGS.map(l => l.id) : []);
+        function setAllLogs(kind, unlock) {
+            writeUnlocked(kind, unlock ? ARCHIVE[kind].logs.map(l => l.id) : []);
         }
 
-        function renderAudioControls() {
-            const unlocked = readAudioUnlocked();
-            const wrapper = document.getElementById('audio-log-controls');
+        function renderArchiveControls(kind) {
+            const logs = ARCHIVE[kind].logs;
+            const unlocked = readUnlocked(kind);
+            const wrapper = document.getElementById(`${kind}-log-controls`);
             wrapper.replaceChildren();
 
-            AUDIO_LOGS.forEach(log => {
+            logs.forEach(log => {
                 const open = unlocked.includes(log.id);
                 const card = document.createElement('div');
                 card.className = `p-3 rounded border space-y-2 ${open ? 'bg-emerald-950/20 border-emerald-800' : 'bg-gray-900/50 border-rose-950'}`;
@@ -578,23 +609,25 @@
                 btn.type = 'button';
                 btn.className = `w-full py-2 border font-orbitron text-[10px] font-bold rounded tracking-widest transition cursor-pointer ${open ? 'bg-emerald-950 hover:bg-emerald-900 border-emerald-500 text-emerald-300' : 'bg-amber-950 hover:bg-amber-900 border-amber-500 text-amber-300'}`;
                 btn.textContent = open ? '✓ UNLOCKED (CLICK TO LOCK)' : '🔓 UNLOCK LOG';
-                btn.addEventListener('click', () => toggleAudioLog(log.id));
+                btn.addEventListener('click', () => toggleLog(kind, log.id));
 
                 card.append(code, title, btn);
                 wrapper.append(card);
             });
 
-            const count = unlocked.filter(id => AUDIO_LOGS.some(l => l.id === id)).length;
-            document.getElementById('audio-unlock-count').textContent = `${count} / ${AUDIO_LOGS.length} UNLOCKED`;
+            const count = unlocked.filter(id => logs.some(l => l.id === id)).length;
+            document.getElementById(`${kind}-unlock-count`).textContent = `${count} / ${logs.length} UNLOCKED`;
         }
 
         window.addEventListener('storage', (e) => {
-            if (e.key === AUDIO_STORAGE_KEY) renderAudioControls();
+            Object.keys(ARCHIVE).forEach(kind => {
+                if (e.key === ARCHIVE[kind].key) renderArchiveControls(kind);
+            });
         });
 
         window.onload = () => {
             init();
-            renderAudioControls();
+            Object.keys(ARCHIVE).forEach(renderArchiveControls);
         };
     </script>
 </body>

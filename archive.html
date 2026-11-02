@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUDIO ARCHIVE // BEACON 3A-R3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #030712;
+            color: #22d3ee;
+            background-image:
+                radial-gradient(rgba(14, 116, 144, 0.15) 1px, transparent 0),
+                linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px, 12px 12px, 12px 12px;
+        }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .crt-overlay {
+            position: fixed;
+            inset: 0;
+            background:
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .scanline {
+            width: 100%;
+            height: 4px;
+            background: rgba(34, 211, 238, 0.2);
+            opacity: 0.75;
+            position: absolute;
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+        .glow-text { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+        audio { width: 100%; filter: invert(0.9) hue-rotate(150deg); }
+        video { width: 100%; max-height: 28rem; background: #000; border-radius: 0.25rem; border: 1px solid rgba(6, 182, 212, 0.3); }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #030712; }
+        ::-webkit-scrollbar-thumb { background: #0e7490; }
+    </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen flex flex-col relative text-base md:text-lg">
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
+
+    <header class="border-b-2 border-cyan-500/40 pb-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-950/80 p-4 rounded backdrop-blur relative z-10">
+        <div>
+            <div class="flex items-center gap-3">
+                <span class="inline-block w-3.5 h-3.5 bg-cyan-400 animate-pulse rounded-full" aria-hidden="true"></span>
+                <h1 class="text-2xl md:text-4xl font-orbitron font-black tracking-widest text-cyan-400 glow-text">AUDIO ARCHIVE // BEACON 3A-R3D</h1>
+            </div>
+            <p class="text-sm text-cyan-600 font-mono mt-1">RECOVERED VOICE & VIDEO LOGS // ACCESS GRANTED BY STATION WARDEN</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
+            <div><span class="text-cyan-700 block text-xs">LOGS UNLOCKED:</span><span id="archive-count" class="text-cyan-300 font-bold">AUDIO 0/6 · VIDEO 0/3</span></div>
+            <a href="player_beacon_blueprint.html" class="text-xs px-3 py-1.5 bg-cyan-950 border border-cyan-500 text-cyan-300 hover:bg-cyan-900 rounded transition font-bold">← PLAYER TERMINAL</a>
+            <a href="index.html" class="text-xs px-3 py-1.5 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold">GATEWAY</a>
+        </div>
+    </header>
+
+    <main class="flex-grow relative z-10 max-w-4xl w-full mx-auto space-y-10">
+        <section aria-labelledby="audio-heading">
+            <h2 id="audio-heading" class="font-orbitron font-bold text-sm tracking-[0.3em] text-cyan-500 border-b border-cyan-900/60 pb-2 mb-4">🎧 AUDIO LOGS</h2>
+            <ul id="audio-list" class="space-y-4"></ul>
+        </section>
+        <section id="video-logs" aria-labelledby="video-heading" class="scroll-mt-4">
+            <h2 id="video-heading" class="font-orbitron font-bold text-sm tracking-[0.3em] text-cyan-500 border-b border-cyan-900/60 pb-2 mb-4">🎬 VIDEO LOGS</h2>
+            <ul id="video-list" class="space-y-4"></ul>
+        </section>
+    </main>
+
+    <footer class="relative z-10 border-t border-cyan-900/60 mt-6 pt-4 text-center text-xs text-cyan-900 tracking-widest">
+        VAD PERSONNEL NETWORK // BEACON 3A-R3D // AUDIO & VIDEO ARCHIVE
+    </footer>
+
+    <script>
+        // Keep ids and titles in sync with ARCHIVE in warden_beacon_master.html.
+        // Replace the placeholder entries and src paths as real files become available.
+        const ARCHIVE = {
+            audio: {
+                key: 'vad_audio_archive_v1',
+                listId: 'audio-list',
+                label: 'AUDIO',
+                missing: 'AUDIO FILE NOT YET INSTALLED',
+                logs: [
+                    { id: 1, code: "AUDIO-LOG #01", title: "[PLACEHOLDER TITLE 01]", desc: "[Placeholder description for audio log 01.]", src: "audio/log-01.mp3" },
+                    { id: 2, code: "AUDIO-LOG #02", title: "[PLACEHOLDER TITLE 02]", desc: "[Placeholder description for audio log 02.]", src: "audio/log-02.mp3" },
+                    { id: 3, code: "AUDIO-LOG #03", title: "[PLACEHOLDER TITLE 03]", desc: "[Placeholder description for audio log 03.]", src: "audio/log-03.mp3" },
+                    { id: 4, code: "AUDIO-LOG #04", title: "[PLACEHOLDER TITLE 04]", desc: "[Placeholder description for audio log 04.]", src: "audio/log-04.mp3" },
+                    { id: 5, code: "AUDIO-LOG #05", title: "[PLACEHOLDER TITLE 05]", desc: "[Placeholder description for audio log 05.]", src: "audio/log-05.mp3" },
+                    { id: 6, code: "AUDIO-LOG #06", title: "Leaving Gateway", desc: "Recovered recording: Leaving Gateway.", src: "audio/welcome to the endless waltz_mixdown.mp3" }
+                ]
+            },
+            video: {
+                key: 'vad_video_archive_v1',
+                listId: 'video-list',
+                label: 'VIDEO',
+                missing: 'VIDEO FILE NOT YET INSTALLED',
+                logs: [
+                    { id: 1, code: "VIDEO-LOG #01", title: "[PLACEHOLDER VIDEO TITLE 01]", desc: "[Placeholder description for video log 01.]", src: "video/log-01.mp4" },
+                    { id: 2, code: "VIDEO-LOG #02", title: "[PLACEHOLDER VIDEO TITLE 02]", desc: "[Placeholder description for video log 02.]", src: "video/log-02.mp4" },
+                    { id: 3, code: "VIDEO-LOG #03", title: "[PLACEHOLDER VIDEO TITLE 03]", desc: "[Placeholder description for video log 03.]", src: "video/log-03.mp4" }
+                ]
+            }
+        };
+
+        const lastSerialized = {};
+
+        function readUnlocked(kind) {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(ARCHIVE[kind].key) || '{}');
+                return Array.isArray(parsed.unlocked) ? parsed.unlocked : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function el(tag, className, text) {
+            const node = document.createElement(tag);
+            if (className) node.className = className;
+            if (text !== undefined) node.textContent = text;
+            return node;
+        }
+
+        function renderSection(kind) {
+            const cfg = ARCHIVE[kind];
+            const raw = localStorage.getItem(cfg.key) || '';
+            if (raw === lastSerialized[kind]) return;
+            lastSerialized[kind] = raw;
+
+            const unlocked = readUnlocked(kind);
+            const list = document.getElementById(cfg.listId);
+            list.replaceChildren();
+
+            cfg.logs.forEach(log => {
+                const open = unlocked.includes(log.id);
+                const item = el('li', `rounded border p-4 md:p-5 ${open ? 'bg-gray-950/90 border-cyan-500/50' : 'bg-gray-950/60 border-zinc-800'}`);
+
+                const top = el('div', 'flex justify-between items-start gap-3 flex-wrap');
+                const heading = el('div');
+                heading.append(
+                    el('span', `text-xs tracking-[0.25em] block ${open ? 'text-cyan-600' : 'text-zinc-600'}`, log.code),
+                    el('h3', `font-orbitron font-bold text-lg md:text-xl mt-1 ${open ? 'text-cyan-200' : 'text-zinc-600'}`, open ? log.title : `[ENCRYPTED ${cfg.label === 'VIDEO' ? 'FOOTAGE' : 'RECORDING'}]`)
+                );
+                top.append(heading, el('span', `text-[11px] px-2 py-0.5 rounded border ${open ? 'bg-emerald-950 text-emerald-400 border-emerald-800' : 'bg-gray-950 text-zinc-500 border-zinc-800'}`, open ? 'UNLOCKED' : 'LOCKED'));
+                item.append(top);
+
+                if (open) {
+                    item.append(el('p', 'text-sm text-cyan-100/80 mt-3', log.desc));
+                    const media = el(kind === 'video' ? 'video' : 'audio');
+                    media.controls = true;
+                    media.preload = 'metadata';
+                    if (kind === 'video') media.playsInline = true;
+                    media.src = log.src;
+                    const note = el('p', 'text-xs text-amber-400 mt-3 hidden', `[ PLACEHOLDER // ${cfg.missing} ]`);
+                    media.addEventListener('error', () => {
+                        media.classList.add('hidden');
+                        note.classList.remove('hidden');
+                    });
+                    const wrap = el('div', 'mt-4');
+                    wrap.append(media, note);
+                    item.append(wrap);
+                } else {
+                    item.append(el('p', 'text-sm text-zinc-600 mt-3', 'ACCESS RESTRICTED // AWAITING WARDEN AUTHORIZATION'));
+                }
+                list.append(item);
+            });
+
+            updateCount();
+        }
+
+        function updateCount() {
+            const parts = Object.keys(ARCHIVE).map(kind => {
+                const logs = ARCHIVE[kind].logs;
+                const n = readUnlocked(kind).filter(id => logs.some(l => l.id === id)).length;
+                return `${ARCHIVE[kind].label} ${n}/${logs.length}`;
+            });
+            document.getElementById('archive-count').textContent = parts.join(' · ');
+        }
+
+        function renderAll() {
+            Object.keys(ARCHIVE).forEach(renderSection);
+        }
+
+        renderAll();
+        window.addEventListener('storage', renderAll);
+        setInterval(renderAll, 800);
+    </script>
+</body>
+</html>
