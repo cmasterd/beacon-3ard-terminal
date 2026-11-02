@@ -52,4 +52,4 @@ The Warden terminal opens with a keypad. The code is `1337` (change `WARDEN_CODE
 
 ## Hosting (GitHub Pages)
 
-Not enabled on purpose. The Warden page contains the master keypad codes and every secret, so publishing it publicly would spoil the game for players who find the URL. If you host it, keep the Warden page off the public site (or behind a hard-to-guess path). Static hosting also does not sync devices: the player and Warden must share one browser, as described above.
+The site is published with GitHub Pages at <https://cmasterd.github.io/beacon-3ard-terminal/index.html> and updates when `master` is pushed. Everything in the repo is public, including the Warden page, its master keypad codes and the `1337` access code, so players who find the URL or read the page source can spoil the game. Share only the player link with players. Static hosting also does not sync devices: the player and Warden terminals must be open in the same browser (same origin), as described above.
