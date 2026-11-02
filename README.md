@@ -38,13 +38,17 @@ An emergency broadcast (typed or preset) appears as a red banner on the player t
 
 The Warden can start, pause, resume and clear a labelled countdown (for example "SELF-DESTRUCT"); the player terminal shows a live clock in the bottom-left and flags when time expires.
 
-The Warden has a **Ship Status Board** with Oxygen, Power, Hull and Comms sliders (0-100%, with -10/+10 buttons). The player terminal shows them as a strip under the header: amber below 60%, red and pulsing below 30%. When a gauge drops below 25% the player terminal sounds the alarm and glitches the screen.
+The Warden has a **Ship Status Board** with Oxygen, Power, Hull and Comms sliders (0-100%, with -10/+10 buttons) and one-click presets (hull breach, power failure, life support failing, blackout, all clear). The player terminal shows them as a strip under the header: amber below 60%, red and pulsing below 30%. When a gauge drops below 25% the player terminal sounds the alarm and glitches the screen.
 
 In a room's detail panel the Warden can set a **Sector Hazard** (vacuum, fire, radiation, toxic gas, xeno contact, power surge). That sector pulses red with a warning tag on both maps, and the player sees a hazard banner when viewing it. Players see the marker even for undiscovered sectors, so set hazards when you want them revealed.
 
 The player terminal plays a short boot-up sequence once per browser tab (click or press a key to skip). The screen briefly glitches on broadcasts, log unlocks and countdown expiry, and locked archive entries flicker. Both effects honour the system "reduce motion" setting.
 
 The player terminal has a **SOUND** button (header). When on, it plays a chime when a log unlocks, an alarm for broadcasts and a siren when the countdown expires. Browsers only allow audio after a click, so press the button (or click anywhere on the page) once after each page load. Browser storage is local to that browser profile; it is not synchronized between devices.
+
+## Warden access code
+
+The Warden terminal opens with a keypad. The code is `1337` (change `WARDEN_CODE` in `warden_beacon_master.html`). It stays unlocked for the rest of that browser tab. This is a client-side gate to keep players out of the GM view; anyone who reads the page source can see the code.
 
 ## Hosting (GitHub Pages)
 

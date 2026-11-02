@@ -53,6 +53,16 @@
     <div class="crt-overlay"></div>
     <div class="scanline"></div>
 
+    <div id="lock-screen" class="fixed inset-0 z-[200] bg-black flex items-center justify-center">
+        <div class="w-72 border border-rose-600/60 bg-gray-950 rounded p-5 text-center shadow-lg">
+            <h2 class="font-orbitron font-bold text-rose-400 tracking-widest text-sm">WARDEN ACCESS</h2>
+            <p class="text-[10px] text-rose-700 font-mono mb-3">ENTER AUTHORIZATION CODE</p>
+            <div id="lock-display" class="h-10 mb-3 bg-black border border-rose-900 rounded text-rose-300 font-mono text-2xl tracking-[0.5em] flex items-center justify-center" aria-live="polite"></div>
+            <div id="lock-pad" class="grid grid-cols-3 gap-2"></div>
+            <p id="lock-msg" class="h-4 mt-3 text-[11px] font-mono text-red-400"></p>
+        </div>
+    </div>
+
     <header class="border-b-2 border-rose-600/40 pb-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-rose-950/30 p-4 rounded backdrop-blur">
         <div>
             <div class="flex items-center gap-3">
@@ -212,6 +222,7 @@
             <span class="text-xs font-bold text-rose-400 tracking-wider">SHIP STATUS BOARD</span>
             <button type="button" onclick="resetShipStatus()" class="text-[10px] px-2 py-1 bg-gray-950 hover:bg-rose-950 border border-rose-800 text-rose-400 rounded cursor-pointer">RESTORE ALL TO 100%</button>
         </div>
+        <div id="status-presets" class="flex flex-wrap gap-2 mb-3"></div>
         <div id="status-controls" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
     </section>
 
@@ -801,6 +812,76 @@
             select.value = STATION.readHazards()[String(activeRoom)] || '';
         }
 
+        // Client-side gate only: it keeps players out of the GM view, not a real security boundary.
+        const WARDEN_CODE = '1337';
+        const WARDEN_AUTH_KEY = 'vad_warden_auth_v1';
+        let lockInput = '';
+
+        function renderLock() {
+            document.getElementById('lock-display').textContent = '*'.repeat(lockInput.length);
+        }
+
+        function lockPress(key) {
+            const msg = document.getElementById('lock-msg');
+            msg.textContent = '';
+            if (key === 'C') lockInput = '';
+            else if (key === 'OK') return submitLock();
+            else if (lockInput.length < WARDEN_CODE.length) lockInput += key;
+            renderLock();
+            if (lockInput.length === WARDEN_CODE.length) submitLock();
+        }
+
+        function submitLock() {
+            if (lockInput === WARDEN_CODE) {
+                sessionStorage.setItem(WARDEN_AUTH_KEY, '1');
+                document.getElementById('lock-screen').classList.add('hidden');
+                document.removeEventListener('keydown', lockKey);
+                return;
+            }
+            lockInput = '';
+            renderLock();
+            document.getElementById('lock-msg').textContent = 'ACCESS DENIED';
+        }
+
+        function lockKey(e) {
+            if (/^[0-9]$/.test(e.key)) lockPress(e.key);
+            else if (e.key === 'Backspace' || e.key === 'Escape') lockPress('C');
+            else if (e.key === 'Enter') lockPress('OK');
+        }
+
+        (function setupLock() {
+            const screen = document.getElementById('lock-screen');
+            if (sessionStorage.getItem(WARDEN_AUTH_KEY) === '1') {
+                screen.classList.add('hidden');
+                return;
+            }
+            const pad = document.getElementById('lock-pad');
+            ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].forEach(k => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = k;
+                b.className = 'py-3 bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-200 font-orbitron font-bold rounded cursor-pointer';
+                b.addEventListener('click', () => lockPress(k));
+                pad.append(b);
+            });
+            document.addEventListener('keydown', lockKey);
+        })();
+
+        const STATUS_PRESETS = {
+            'HULL BREACH': { hull: 25, oxygen: 40 },
+            'POWER FAILURE': { power: 15, comms: 40 },
+            'LIFE SUPPORT FAILING': { oxygen: 20 },
+            'BLACKOUT': { power: 5, comms: 10 },
+            'ALL CLEAR': { oxygen: 100, power: 100, hull: 100, comms: 100 }
+        };
+
+        function applyStatusPreset(name) {
+            const status = STATION.readStatus();
+            Object.assign(status, STATUS_PRESETS[name]);
+            STATION.writeStatus(status);
+            renderStatusControls();
+        }
+
         function setGauge(id, value) {
             const status = STATION.readStatus();
             status[id] = Math.max(0, Math.min(100, Math.round(value)));
@@ -858,6 +939,14 @@
 
         window.onload = () => {
             init();
+            Object.keys(STATUS_PRESETS).forEach(name => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = name;
+                b.className = 'text-[10px] px-2 py-1 bg-gray-950 border border-rose-900 text-rose-300 hover:bg-rose-950 rounded cursor-pointer';
+                b.addEventListener('click', () => applyStatusPreset(name));
+                document.getElementById('status-presets').append(b);
+            });
             renderStatusControls();
             STATION.applyHazards('warden-node');
             Object.keys(ARCHIVE).forEach(renderArchiveControls);
