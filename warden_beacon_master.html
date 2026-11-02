@@ -40,6 +40,15 @@
             100% { top: 100%; }
         }
         .glow-red { text-shadow: 0 0 10px rgba(244, 63, 94, 0.7); }
+        /* Larger text for the Warden; `body` raises specificity over the Tailwind CDN utilities. */
+        body { font-size: 1.125rem; }
+        body .text-\[10px\] { font-size: 0.8125rem; }
+        body .text-\[11px\] { font-size: 0.875rem; }
+        body .text-xs { font-size: 0.9375rem; line-height: 1.4rem; }
+        body .text-sm { font-size: 1.0625rem; line-height: 1.5rem; }
+        body .text-xl { font-size: 1.5rem; line-height: 2rem; }
+        .room-node text[id^="warden-label-"]:not(#warden-label-7b) { font-size: 14px; }
+        .room-node text[id^="warden-sub-"]:not(#warden-sub-7b) { font-size: 11.5px; }
         .room-node { cursor: pointer; transition: all 0.2s ease; }
         .room-node:hover rect { stroke: #f43f5e; stroke-width: 3; fill-opacity: 0.3; }
         .room-node.active rect { stroke: #fb7185; stroke-width: 3; fill: rgba(244, 63, 94, 0.2); }
