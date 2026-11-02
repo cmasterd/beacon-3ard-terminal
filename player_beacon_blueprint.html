@@ -60,13 +60,46 @@
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #030712; }
         ::-webkit-scrollbar-thumb { background: #0e7490; }
+        .vad-stage { position: relative; width: min(60vw, 18rem); height: min(60vw, 18rem); perspective: 700px; }
+        .vad-spin { position: absolute; inset: 0; transform-style: preserve-3d; animation: vad-rotate 7s linear infinite; }
+        .vad-layer { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 0 6px #22d3ee) drop-shadow(0 0 16px rgba(34, 211, 238, 0.7)); }
+        .vad-laser { position: absolute; left: 8%; right: 8%; height: 2px; background: linear-gradient(90deg, transparent, #a5f3fc, transparent); box-shadow: 0 0 10px #22d3ee; animation: vad-scan 3s ease-in-out infinite; }
+        @keyframes vad-rotate { from { transform: rotateY(0deg); } to { transform: rotateY(360deg); } }
+        @keyframes vad-scan { 0%, 100% { top: 8%; opacity: 0; } 15%, 85% { opacity: 0.9; } 50% { top: 92%; } }
+        @media (prefers-reduced-motion: reduce) { .vad-spin, .vad-laser { animation: none; } .vad-laser { display: none; } }
     </style>
 </head>
 <body class="p-4 md:p-6 min-h-screen flex flex-col justify-between select-none relative text-base md:text-lg">
     <div class="crt-overlay"></div>
-    <div id="boot-overlay" class="hidden fixed inset-0 z-[100] bg-black text-cyan-400 font-mono p-6 md:p-12 cursor-pointer" role="dialog" aria-label="Boot sequence">
-        <pre id="boot-text" class="whitespace-pre-wrap text-sm md:text-lg leading-relaxed"></pre>
-        <p class="absolute bottom-6 right-6 text-xs text-cyan-800">CLICK OR PRESS ANY KEY TO SKIP</p>
+    <div id="boot-overlay" class="hidden fixed inset-0 z-[100] bg-black text-cyan-400 font-mono" role="dialog" aria-label="Terminal login">
+        <div id="login-screen" class="absolute inset-0 flex flex-col items-center justify-center gap-6 p-6">
+            <div class="vad-stage">
+                <div class="vad-spin">
+                    <svg class="vad-logo vad-layer" style="transform: translateZ(-10px)" viewBox="0 0 200 200" aria-hidden="true"><use href="#vad-mark"/></svg>
+                    <svg class="vad-logo vad-layer" viewBox="0 0 200 200" role="img" aria-label="VAD logo">
+                        <defs>
+                            <g id="vad-mark" fill="none" stroke="#22d3ee" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+                                <path d="M45 25 H100 A75 75 0 0 1 100 175 H45 Z"/>
+                                <path d="M62 140 L105 58 L148 140 M80 118 H130"/>
+                                <path d="M62 58 L105 140 L148 58" stroke="#67e8f9"/>
+                            </g>
+                        </defs>
+                        <use href="#vad-mark"/>
+                    </svg>
+                    <svg class="vad-logo vad-layer" style="transform: translateZ(10px)" viewBox="0 0 200 200" aria-hidden="true"><use href="#vad-mark"/></svg>
+                </div>
+                <div class="vad-laser"></div>
+            </div>
+            <div class="text-center">
+                <div class="font-orbitron font-black tracking-[0.4em] text-2xl md:text-4xl text-cyan-300 glow-text">VAD SALVAGE</div>
+                <div class="text-xs md:text-sm text-cyan-700 tracking-widest mt-2">PERSONNEL TERMINAL // BEACON 3A-R3D</div>
+            </div>
+            <button id="login-btn" type="button" class="font-orbitron font-bold tracking-[0.35em] px-10 py-3 bg-cyan-950 border-2 border-cyan-400 text-cyan-200 hover:bg-cyan-900 rounded transition shadow-[0_0_20px_rgba(34,211,238,0.35)] animate-pulse">LOGIN</button>
+        </div>
+        <div id="boot-screen" class="hidden absolute inset-0 p-6 md:p-12">
+            <pre id="boot-text" class="whitespace-pre-wrap text-sm md:text-xl leading-relaxed"></pre>
+            <button id="boot-skip" type="button" class="absolute bottom-6 right-6 text-xs text-cyan-800 hover:text-cyan-500">SKIP &gt;&gt;</button>
+        </div>
     </div>
     <div class="scanline"></div>
 
@@ -305,7 +338,7 @@
             setInterval(checkCountdown, 250);
         }
 
-        // Shown once per browser tab; any click or key skips it.
+        // Shown once per browser tab: rotating VAD logo and a LOGIN button, then a readable boot sequence.
         const BOOT_LINES = [
             'VAD SALVAGE // BEACON 3A-R3D',
             'PERSONNEL TERMINAL v3.1',
@@ -315,37 +348,44 @@
             '> LIFE SUPPORT TELEMETRY ............. DEGRADED',
             '> SOVEREIGN ENGINE ................... SECURE IN VAULT',
             '',
+            'ACCESS GRANTED.',
             'WELCOME, OPERATIVE.'
         ];
 
         function runBootSequence() {
             if (sessionStorage.getItem('vad_boot_seen_v1')) return;
-            sessionStorage.setItem('vad_boot_seen_v1', '1');
             const overlay = document.getElementById('boot-overlay');
+            const loginScreen = document.getElementById('login-screen');
+            const bootScreen = document.getElementById('boot-screen');
+            const loginBtn = document.getElementById('login-btn');
             const out = document.getElementById('boot-text');
             const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             let timer = null;
             const finish = () => {
                 clearTimeout(timer);
                 overlay.classList.add('hidden');
-                document.removeEventListener('keydown', finish);
-                overlay.removeEventListener('click', finish);
+                document.getElementById('boot-skip').removeEventListener('click', finish);
             };
             overlay.classList.remove('hidden');
-            document.addEventListener('keydown', finish);
-            overlay.addEventListener('click', finish);
-            if (reduced) {
-                out.textContent = BOOT_LINES.join('\n');
-                timer = setTimeout(finish, 1500);
-                return;
-            }
-            let line = 0;
-            const next = () => {
-                if (line >= BOOT_LINES.length) { timer = setTimeout(finish, 800); return; }
-                out.textContent += BOOT_LINES[line++] + '\n';
-                timer = setTimeout(next, 280);
-            };
-            next();
+            loginBtn.focus();
+            loginBtn.addEventListener('click', () => {
+                sessionStorage.setItem('vad_boot_seen_v1', '1');
+                loginScreen.classList.add('hidden');
+                bootScreen.classList.remove('hidden');
+                document.getElementById('boot-skip').addEventListener('click', finish);
+                if (reduced) {
+                    out.textContent = BOOT_LINES.join('\n');
+                    timer = setTimeout(finish, 3000);
+                    return;
+                }
+                let line = 0;
+                const next = () => {
+                    if (line >= BOOT_LINES.length) { timer = setTimeout(finish, 2000); return; }
+                    out.textContent += BOOT_LINES[line++] + '\n';
+                    timer = setTimeout(next, 650);
+                };
+                next();
+            }, { once: true });
         }
 
         function triggerGlitch() {

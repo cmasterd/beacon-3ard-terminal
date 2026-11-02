@@ -44,7 +44,7 @@ The Warden has a **Ship Status Board** with Oxygen, Power, Hull and Comms slider
 
 In a room's detail panel the Warden can set a **Sector Hazard** (vacuum, fire, radiation, toxic gas, xeno contact, power surge). That sector pulses red with a warning tag on both maps, and the player sees a hazard banner when viewing it. Players see the marker even for undiscovered sectors, so set hazards when you want them revealed.
 
-The player terminal plays a short boot-up sequence once per browser tab (click or press a key to skip). The screen briefly glitches on broadcasts, log unlocks and countdown expiry, and locked archive entries flicker. Both effects honour the system "reduce motion" setting.
+The player terminal opens with a login screen once per browser tab: a rotating laser-style VAD logo and a **LOGIN** button. Pressing it runs a slow boot sequence (about 8 seconds, with a SKIP button) before the terminal appears; the login click also counts as the click browsers need before audio can play. The screen briefly glitches on broadcasts, log unlocks and countdown expiry, and locked archive entries flicker. Both effects honour the system "reduce motion" setting.
 
 The player terminal has a **SOUND** button (header). When on, it plays a chime when a log unlocks, an alarm for broadcasts and a siren when the countdown expires. Browsers only allow audio after a click, so press the button (or click anywhere on the page) once after each page load. Browser storage is local to that browser profile; it is not synchronized between devices.
 
