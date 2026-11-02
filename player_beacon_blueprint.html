@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAD PERSONNEL BRIEFING // BEACON 3A-R3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #030712;
+            color: #22d3ee;
+            background-image: 
+                radial-gradient(rgba(14, 116, 144, 0.15) 1px, transparent 0),
+                linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
+            background-size: 24px 24px, 12px 12px, 12px 12px;
+        }
+        .font-orbitron { font-family: 'Orbitron', sans-serif; }
+        .crt-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .scanline {
+            width: 100%;
+            height: 4px;
+            background: rgba(34, 211, 238, 0.2);
+            opacity: 0.75;
+            position: absolute;
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { top: 0%; }
+            100% { top: 100%; }
+        }
+        .glow-text { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
+        .room-node { cursor: pointer; transition: all 0.2s ease; }
+        .room-node:hover rect { stroke: #22d3ee; stroke-width: 3; fill-opacity: 0.3; }
+        .room-node.active rect { stroke: #f59e0b; stroke-width: 3; fill: rgba(245, 158, 11, 0.2); }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #030712; }
+        ::-webkit-scrollbar-thumb { background: #0e7490; }
+    </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen flex flex-col justify-between select-none relative text-base md:text-lg">
+    <div class="crt-overlay"></div>
+    <div class="scanline"></div>
+
+    <div id="hud-popup-screen" class="fixed inset-0 bg-black/90 z-50 flex-col items-center justify-center border-8 backdrop-blur-md hidden">
+        <div id="hud-popup-box" class="text-center p-8 bg-black border-4 rounded-xl shadow-2xl max-w-2xl w-full">
+            <div id="hud-popup-title" class="text-3xl md:text-5xl font-orbitron font-black tracking-widest mb-4 animate-pulse">NOTIFICATION</div>
+            <p id="hud-popup-msg" class="text-lg md:text-xl font-mono uppercase leading-relaxed">MESSAGE HERE</p>
+        </div>
+    </div>
+
+    <div id="permanent-end-screen" class="fixed inset-0 bg-black/98 z-50 flex flex-col items-center justify-center p-6 border-8 backdrop-blur-lg hidden">
+        <button id="endgame-reset-btn" onclick="resetExploration()" class="absolute top-6 right-6 px-6 py-3 bg-red-950 hover:bg-red-900 border-2 border-red-500 text-red-300 font-orbitron text-base font-bold rounded shadow-2xl tracking-widest transition cursor-pointer z-50">🔄 SYSTEM RESET</button>
+        <div id="endgame-card" class="text-center p-10 bg-black border-4 rounded-2xl shadow-2xl max-w-3xl w-full">
+            <div id="endgame-title" class="text-3xl md:text-5xl font-orbitron font-black tracking-widest mb-6 animate-pulse">MISSION CONCLUDED</div>
+            <p id="endgame-msg" class="text-xl md:text-2xl font-mono uppercase leading-relaxed mb-8">ENDGAME STATUS</p>
+            <div class="pt-6 border-t border-zinc-800 text-sm md:text-base font-mono text-zinc-500 tracking-widest uppercase">[ WARDEN HAS TAKEN OVER TERMINAL CONTROL ]</div>
+        </div>
+    </div>
+
+    <header class="border-b-2 border-cyan-500/40 pb-4 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-950/80 p-4 rounded backdrop-blur">
+        <div>
+            <div class="flex items-center gap-3">
+                <span class="inline-block w-3.5 h-3.5 bg-cyan-400 animate-pulse rounded-full"></span>
+                <h1 class="text-2xl md:text-4xl font-orbitron font-black tracking-widest text-cyan-400 glow-text">VAD SALVAGE // BEACON 3A-R3D</h1>
+            </div>
+            <p class="text-sm text-cyan-600 font-mono mt-1">OPERATIVE FIELD SCHEMATIC // ESCAPE SHUTTLE BAY & ULTIMATUM ACTIVE</p>
+        </div>
+        <div class="flex flex-wrap gap-4 text-sm font-mono border-l-0 md:border-l border-cyan-500/30 pl-0 md:pl-4">
+            <div><span class="text-cyan-700 block text-xs">MISSION PROFILE:</span><span class="text-cyan-300 font-bold">STATION RECOVERY & SALVAGE</span></div>
+            <div><span class="text-cyan-700 block text-xs">SOVEREIGN ENGINE:</span><span id="header-engine-status" class="text-cyan-300 font-bold">SECURE IN VAULT</span></div>
+        </div>
+    </header>
+
+    <main class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+        <section class="lg:col-span-7 xl:col-span-8 bg-gray-950/90 border border-cyan-500/40 rounded p-4 flex flex-col justify-between shadow-lg relative">
+            <div class="flex justify-between items-center mb-2 border-b border-cyan-900/60 pb-2">
+                <span class="text-sm font-bold text-cyan-400 tracking-wider flex items-center gap-2">STATION SCHEMATIC (SECTOR 10 ESCAPE SHUTTLE BAY)</span>
+                <button onclick="resetExploration()" class="text-xs px-3 py-1.5 bg-red-950/40 border border-red-800 text-red-400 hover:bg-red-900/60 rounded transition cursor-pointer font-bold">RESET BLUEPRINT</button>
+            </div>
+
+            <div class="relative w-full overflow-x-auto flex justify-center items-center py-4">
+                <svg viewBox="0 0 800 780" class="w-full max-w-[880px] h-auto">
+                    <defs><pattern id="blueprint-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(14, 116, 144, 0.15)" stroke-width="0.5" /></pattern></defs>
+                    <rect width="800" height="780" fill="url(#blueprint-grid)" />
+                    <g stroke="#0e7490" stroke-width="3.5" fill="none" opacity="0.65">
+                        <line x1="400" y1="75" x2="400" y2="135" stroke-dasharray="4" />
+                        <line x1="400" y1="195" x2="250" y2="255" />
+                        <line x1="400" y1="195" x2="550" y2="255" />
+                        <line x1="250" y1="315" x2="250" y2="380" />
+                        <line x1="550" y1="315" x2="550" y2="380" />
+                        <line x1="250" y1="285" x2="550" y2="285" stroke-dasharray="2" />
+                        <line x1="250" y1="440" x2="250" y2="500" />
+                        <line x1="550" y1="440" x2="550" y2="500" />
+                        <line x1="250" y1="500" x2="550" y2="500" />
+                        <line x1="250" y1="560" x2="250" y2="620" />
+                        <line x1="550" y1="560" x2="550" y2="620" />
+                        <line x1="250" y1="655" x2="550" y2="655" />
+                        <line id="path-7b" x1="140" y1="530" x2="70" y2="530" stroke-dasharray="2" stroke="#22d3ee" opacity="0.2" />
+                    </g>
+                    
+                    <g class="room-node" onclick="selectRoom(1)" id="node-1"><rect x="280" y="20" width="240" height="55" rx="6" fill="#030712" stroke="#22d3ee" stroke-width="2" /><text x="400" y="47" fill="#22d3ee" font-size="13" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-1">DROPSHIP LANDING RIG</text><text x="400" y="63" fill="#0891b2" font-size="10" text-anchor="middle" id="sub-1">[DOCKING RIG]</text></g>
+                    <g class="room-node" onclick="selectRoom(2)" id="node-2"><rect x="280" y="135" width="240" height="60" rx="6" fill="#030712" stroke="#374151" stroke-width="2" /><text x="400" y="162" fill="#6b7280" font-size="13" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-2">02. [UNEXPLORED]</text><text x="400" y="180" fill="#4b5563" font-size="10" text-anchor="middle" id="sub-2">[CLICK TO SCAN]</text></g>
+                    <g class="room-node" onclick="selectRoom(3)" id="node-3"><rect x="140" y="255" width="220" height="60" rx="6" fill="#030712" stroke="#374151" stroke-width="2" /><text x="250" y="282" fill="#6b7280" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-3">03. [UNEXPLORED]</text><text x="250" y="300" fill="#4b5563" font-size="10" text-anchor="middle" id="sub-3">[CLICK TO SCAN]</text></g>
+                    <g class="room-node" onclick="selectRoom(4)" id="node-4"><rect x="440" y="255" width="220" height="60" rx="6" fill="#030712" stroke="#374151" stroke-width="2" /><text x="550" y="282" fill="#6b7280" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-4">04. [UNEXPLORED]</text><text x="550" y="300" fill="#4b5563" font-size="10" text-anchor="middle" id="sub-4">[CLICK TO SCAN]</text></g>
+                    <g class="room-node" onclick="selectRoom(5)" id="node-5"><rect x="140" y="380" width="220" height="60" rx="6" fill="#030712" stroke="#f59e0b" stroke-width="2" /><text x="250" y="407" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-5">05. [KEYPAD LOCKED]</text><text x="250" y="425" fill="#d97706" font-size="10" text-anchor="middle" id="sub-5">[REQUIRES CODE]</text></g>
+                    <g class="room-node" onclick="selectRoom(6)" id="node-6"><rect x="440" y="380" width="220" height="60" rx="6" fill="#030712" stroke="#f59e0b" stroke-width="2" /><text x="550" y="407" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-6">06. [KEYPAD LOCKED]</text><text x="550" y="425" fill="#d97706" font-size="10" text-anchor="middle" id="sub-6">[REQUIRES CODE]</text></g>
+                    <g class="room-node" onclick="selectRoom(7)" id="node-7"><rect x="140" y="500" width="220" height="60" rx="6" fill="#030712" stroke="#f59e0b" stroke-width="2" /><text x="250" y="527" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-7">07. [KEYPAD LOCKED]</text><text x="250" y="545" fill="#d97706" font-size="10" text-anchor="middle" id="sub-7">[REQUIRES CODE]</text></g>
+                    
+                    <!-- 7B PLAYER NODE -->
+                    <g class="room-node" onclick="selectRoom('7b')" id="node-7b" style="display: none;"><rect x="10" y="500" width="110" height="60" rx="6" fill="#180308" stroke="#f43f5e" stroke-width="2" /><text x="65" y="525" fill="#f43f5e" font-size="10" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-7b">07-B CORE</text><text x="65" y="542" fill="#fda4af" font-size="7" text-anchor="middle" id="sub-7b">[MAINFRAME]</text></g>
+                    
+                    <g class="room-node" onclick="selectRoom(8)" id="node-8"><rect x="440" y="500" width="220" height="60" rx="6" fill="#030712" stroke="#f59e0b" stroke-width="2" /><text x="550" y="527" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-8">08. [KEYPAD LOCKED]</text><text x="550" y="545" fill="#d97706" font-size="10" text-anchor="middle" id="sub-8">[REQUIRES CODE]</text></g>
+                    <g class="room-node" onclick="selectRoom(9)" id="node-9"><rect x="140" y="620" width="220" height="60" rx="6" fill="#030712" stroke="#374151" stroke-width="2" /><text x="250" y="647" fill="#6b7280" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-9">09. [UNEXPLORED]</text><text x="250" y="665" fill="#4b5563" font-size="10" text-anchor="middle" id="sub-9">[CLICK TO SCAN]</text></g>
+                    <g class="room-node" onclick="selectRoom(10)" id="node-10"><rect x="440" y="620" width="220" height="60" rx="6" fill="#030712" stroke="#f59e0b" stroke-width="2" /><text x="550" y="647" fill="#f59e0b" font-size="12" font-family="'Share Tech Mono'" font-weight="bold" text-anchor="middle" id="label-10">10. [KEYPAD LOCKED]</text><text x="550" y="665" fill="#d97706" font-size="10" text-anchor="middle" id="sub-10">[REQUIRES CODE]</text></g>
+                </svg>
+            </div>
+            <div class="border-t border-cyan-900/60 pt-2 flex justify-between text-sm font-bold text-cyan-500"><span id="exploration-progress">SECTORS DISCOVERED: 1 / 10</span></div>
+        </section>
+
+        <section class="lg:col-span-5 xl:col-span-4 flex flex-col gap-4">
+            <div class="bg-gray-950/90 border border-cyan-500/40 rounded p-5 flex-grow shadow-lg flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start border-b border-cyan-900/60 pb-3 mb-4">
+                        <div>
+                            <span id="detail-number" class="text-sm text-cyan-500 font-mono block font-bold">SECTOR ID: 01</span>
+                            <h2 id="detail-name" class="text-xl md:text-2xl font-orbitron font-bold text-cyan-200 mt-1">DROPSHIP LANDING RIG</h2>
+                        </div>
+                        <div class="flex gap-1.5 flex-wrap justify-end">
+                            <span id="badge-exp" class="text-xs px-2.5 py-1 rounded bg-cyan-950 text-cyan-300 border border-cyan-700 font-bold">EXPLORED</span>
+                            <span id="badge-srch" class="text-xs px-2.5 py-1 rounded bg-gray-950 text-gray-500 border border-gray-800 font-bold">UNSEARCHED</span>
+                            <span id="badge-log" class="text-xs px-2.5 py-1 rounded bg-gray-950 text-gray-500 border border-gray-800 font-bold">LOG LOCKED</span>
+                        </div>
+                    </div>
+                    <div class="space-y-4 text-sm md:text-base font-mono">
+                        <div><span class="text-cyan-600 uppercase block font-bold text-xs">1. Layout & Environment</span><p id="detail-env" class="text-cyan-200 mt-1 leading-relaxed">Mercenary transport docking collar.</p></div>
+                        <div><span class="text-cyan-600 uppercase block font-bold text-xs">2. Notable Gear / Items</span><p id="detail-loot" class="text-cyan-300 mt-1 font-bold">[UNSEARCHED CACHE]</p></div>
+                    </div>
+                </div>
+
+                <div id="keypad-panel" class="my-4 bg-gray-900/95 border-2 border-amber-500/60 p-4 rounded-lg text-center shadow-2xl hidden">
+                    <div class="text-sm font-orbitron text-amber-400 font-bold tracking-widest mb-2">SECURITY ACCESS TERMINAL</div>
+                    <div id="keypad-display" class="bg-black text-amber-400 font-mono text-3xl tracking-[12px] py-3 px-4 border-2 border-amber-500/40 rounded shadow-inner mb-4 font-bold">____</div>
+                    <div class="grid grid-cols-3 gap-2 w-full font-mono text-lg">
+                        <button onclick="pressKey('1')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">1</button>
+                        <button onclick="pressKey('2')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">2</button>
+                        <button onclick="pressKey('3')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">3</button>
+                        <button onclick="pressKey('4')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">4</button>
+                        <button onclick="pressKey('5')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">5</button>
+                        <button onclick="pressKey('6')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">6</button>
+                        <button onclick="pressKey('7')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">7</button>
+                        <button onclick="pressKey('8')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">8</button>
+                        <button onclick="pressKey('9')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">9</button>
+                        <button onclick="clearKeypad()" class="bg-red-950 hover:bg-red-900 text-red-400 py-3.5 rounded border border-red-800 font-bold cursor-pointer">C</button>
+                        <button onclick="pressKey('0')" class="bg-gray-800 hover:bg-gray-700 text-cyan-200 py-3.5 rounded border border-cyan-600 font-bold cursor-pointer">0</button>
+                        <button onclick="submitKeypad()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 py-3.5 rounded border border-emerald-700 font-bold cursor-pointer">ENTER</button>
+                    </div>
+                </div>
+
+                <div id="action-controls" class="my-4 flex flex-col gap-3">
+                    <button id="btn-reopen-keypad" onclick="toggleKeypad()" class="w-full py-3 bg-amber-950 hover:bg-amber-900 border border-amber-500 text-amber-300 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg hidden cursor-pointer">🔢 ACCESS SECURITY KEYPAD</button>
+                    <button id="btn-explore" onclick="doExplore()" class="w-full py-3 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500 text-cyan-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer">⚡ 1. EXPLORE SECTOR</button>
+                    
+                    <div id="tier-actions" class="grid grid-cols-2 gap-2.5 hidden">
+                        <button id="btn-search" onclick="doSearch()" class="w-full py-3 bg-yellow-950 hover:bg-yellow-900 border border-yellow-500 text-yellow-300 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer">🔍 SEARCH ITEMS</button>
+                        <button id="btn-log" onclick="doLog()" class="w-full py-3 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500 text-emerald-300 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer">💻 ACCESS LOGS</button>
+                    </div>
+
+                    <button id="btn-pickup-engine" onclick="pickupEngine()" class="w-full py-3 bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg hidden cursor-pointer animate-pulse">📦 PICK UP SOVEREIGN ENGINE</button>
+                    <button id="btn-plug-engine" onclick="plugInEngine()" class="w-full py-3 bg-blue-950 hover:bg-blue-900 border border-blue-500 text-blue-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg hidden cursor-pointer animate-pulse">⚡ PLUG SOVEREIGN ENGINE INTO MAIN POWER</button>
+
+                    <div id="escape-ultimatum" class="grid grid-cols-1 gap-3 hidden mt-2">
+                        <button onclick="triggerEscape()" class="w-full py-4 px-6 bg-emerald-950 hover:bg-emerald-900 border-4 border-emerald-500 text-emerald-200 font-orbitron text-base md:text-lg font-black rounded-xl tracking-widest transition shadow-2xl animate-pulse cursor-pointer">🚀 OPEN BAY & ESCAPE</button>
+                        <button onclick="triggerDestruct()" class="w-full py-4 px-6 bg-red-950 hover:bg-red-900 border-4 border-red-600 text-red-200 font-orbitron text-base md:text-lg font-black rounded-xl tracking-widest transition shadow-2xl animate-pulse cursor-pointer">💥 INITIATE STATION SELF-DESTRUCT</button>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-cyan-900/60 bg-gray-900/50 p-3.5 rounded border border-cyan-950">
+                    <div class="flex justify-between items-center mb-1.5"><span class="text-xs font-bold text-cyan-400">TERMINAL LOG:</span><span id="log-id" class="text-xs text-cyan-600 font-mono font-bold">VAD-BRIEF #01</span></div>
+                    <p id="log-text" class="text-sm md:text-base text-cyan-200 italic font-mono leading-relaxed">"Standard corporate recovery protocol."</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const roomData = {
+            1: { name: "01. DROPSHIP LANDING RIG", sub: "[DOCKING RIG]", env: "Mercenary transport docking collar.", loot: "Magnetic towing lines, hull repair patches.", logId: "VAD-BRIEF #01", log: "Standard corporate recovery protocol.", code: null },
+            2: { name: "02. DOCKING BAY ALPHA", sub: "[AIRLOCK ENTRY]", env: "Primary airlock entry vestibule.", loot: "Mag-boot rack, EVA tools.", logId: "LOG-VANCE #01", log: "Airlock doors iced over.", code: null },
+            3: { name: "03. SERVICE VENT & CATWALK", sub: "[ZERO-G SHAFT]", env: "Narrow zero-gravity crawlway.", loot: "Industrial utility wrench, tether lines.", logId: "SYS-NOTE #04", log: "Zero-gravity transit corridor.", code: null },
+            4: { name: "04. CREW QUARTERS & MESS", sub: "[LIVING SECTOR]", env: "Habitation ring with bunks.", loot: "Emergency rations, emergency survival blanket.", logId: "LOG-LIN #01", log: "Sudden evacuation recorded.", code: null },
+            5: { name: "05. MED-LAB & CRYO-STASIS", sub: "[MEDICAL WARD]", env: "Medical treatment bays.", loot: "Trauma kit, sterile surgical instruments.", logId: "LOG-LIN #05", log: "Cryo-stasis power failure.", code: "0303" },
+            6: { name: "06. SECURITY CHECKPOINT", sub: "[ARMORY ACCESS]", env: "Station security hub.", loot: "Shotgun shells, tactical riot shield.", logId: "SEC-AUTO #02", log: "Armory locked under security protocol.", code: "8812" },
+            7: { name: "07. MAIN ENGINEERING", sub: "[REACTOR VAULT]", env: "Primary engineering deck with heavy reactor terminals.", loot: "Plasma cutter, high-capacity power cell.", logId: "LOG-VANCE #08", log: "Reactor shut down by Chief Vance.", code: "9942" },
+            '7b': { name: "07-B. CORE MAINFRAME", sub: "[MIND-CORE CHAMBER]", env: "Warm, pulsing organic chamber. WARNING: The Mind-Core Node entity is present and broadcasting here!", loot: "Parasitic spore sample, neural data spool.", logId: "LOG-HIVE #03", log: "\"Dr. Aris Vane's consciousness is merged directly into the core mainframe!\"", code: null },
+            8: { name: "08. DEEP RESEARCH SUB-LEVEL", sub: "[SOVEREIGN CHAMBER]", env: "Sub-zero research lab housing the Sovereign Engine.", loot: "🌟 SOVEREIGN ENGINE CORE (CRITICAL ITEM)", logId: "LOG-VANE #45", log: "Anomalous energy fluctuations.", code: "2101" },
+            9: { name: "09. EXTERIOR COMMS SPIRE", sub: "[RELAY & GANTRY]", env: "Exposed exterior gantry.", loot: "Orbital transmitter hardware.", logId: "COM-STAT #12", log: "Communications relay misaligned.", code: null },
+            10: { name: "10. ESCAPE SHUTTLE BAY", sub: "[FINAL ULTIMATUM]", env: "Secure launch bay housing the last operational emergency escape shuttle and station self-destruct mechanism.", loot: "Emergency flight logs, emergency beacon transponder.", logId: "LOG-EVAC #01", log: "\"Warning: Station purge protocol linked directly to core mainframe.\"", code: "5666" }
+        };
+
+        const STORAGE_KEY = 'vad_shared_station_state_v14';
+        let state = {};
+        let activeRoom = 1;
+        let keypadInput = "";
+        let showKeypadManual = false;
+        let lastSerializedState = "";
+
+        function init() {
+            loadState();
+            updateGridVisuals();
+            selectRoom(activeRoom);
+
+            setInterval(() => {
+                const currentStored = localStorage.getItem(STORAGE_KEY);
+                if (currentStored && currentStored !== lastSerializedState) {
+                    loadState();
+                    updateGridVisuals();
+                    renderPanelContent();
+                }
+            }, 800);
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                state = JSON.parse(saved);
+                lastSerializedState = saved;
+            } else {
+                resetState();
+            }
+        }
+
+        function resetState() {
+            state = {};
+            for (let id of [1,2,3,4,5,6,7,'7b',8,9,10]) {
+                const hasCode = roomData[id].code !== null;
+                state[id] = {
+                    unlocked: !hasCode,
+                    explored: id === 1,
+                    searched: false,
+                    logUnlocked: false,
+                    engineCollected: false,
+                    enginePowered: false,
+                    wardenAllowPickup: false,
+                    wardenAllowPlug: false,
+                    wardenAllow7bVis: false
+                };
+            }
+            saveState();
+        }
+
+        function saveState() {
+            const serialized = JSON.stringify(state);
+            localStorage.setItem(STORAGE_KEY, serialized);
+            lastSerializedState = serialized;
+        }
+
+        function triggerHudPopup(title, msg, type = 'purple') {
+            const screen = document.getElementById('hud-popup-screen');
+            const box = document.getElementById('hud-popup-box');
+            const titleEl = document.getElementById('hud-popup-title');
+            const msgEl = document.getElementById('hud-popup-msg');
+
+            titleEl.innerText = title;
+            msgEl.innerText = msg;
+            screen.classList.remove('hidden');
+            screen.classList.add('flex');
+
+            if (type === 'purple') {
+                screen.className = "fixed inset-0 bg-purple-950/90 z-50 flex flex-col items-center justify-center border-8 border-purple-600 backdrop-blur-md flex";
+                box.className = "text-center p-8 bg-black/90 border-4 border-purple-500 rounded-xl shadow-2xl max-w-2xl w-full";
+                titleEl.className = "text-3xl md:text-5xl font-orbitron font-black text-purple-400 tracking-widest mb-4 animate-pulse";
+                msgEl.className = "text-lg md:text-xl font-mono text-purple-200 uppercase leading-relaxed";
+            } else if (type === 'blue') {
+                screen.className = "fixed inset-0 bg-blue-950/90 z-50 flex flex-col items-center justify-center border-8 border-blue-600 backdrop-blur-md flex";
+                box.className = "text-center p-8 bg-black/90 border-4 border-blue-500 rounded-xl shadow-2xl max-w-2xl w-full";
+                titleEl.className = "text-3xl md:text-5xl font-orbitron font-black text-blue-400 tracking-widest mb-4 animate-pulse";
+                msgEl.className = "text-lg md:text-xl font-mono text-blue-200 uppercase leading-relaxed";
+            } else if (type === 'error') {
+                screen.className = "fixed inset-0 bg-red-950/90 z-50 flex flex-col items-center justify-center border-8 border-red-600 backdrop-blur-md flex";
+                box.className = "text-center p-8 bg-black/90 border-4 border-red-500 rounded-xl shadow-2xl max-w-2xl w-full";
+                titleEl.className = "text-3xl md:text-5xl font-orbitron font-black text-red-500 tracking-widest mb-4 animate-pulse";
+                msgEl.className = "text-lg md:text-xl font-mono text-red-300 uppercase leading-relaxed";
+            } else {
+                screen.className = "fixed inset-0 bg-emerald-950/90 z-50 flex flex-col items-center justify-center border-8 border-emerald-500 backdrop-blur-md flex";
+                box.className = "text-center p-8 bg-black/90 border-4 border-emerald-400 rounded-xl shadow-2xl max-w-2xl w-full";
+                titleEl.className = "text-3xl md:text-5xl font-orbitron font-black text-emerald-400 tracking-widest mb-4 animate-pulse";
+                msgEl.className = "text-lg md:text-xl font-mono text-emerald-200 uppercase leading-relaxed";
+            }
+
+            setTimeout(() => {
+                screen.className = "fixed inset-0 bg-black/90 z-50 flex-col items-center justify-center border-8 backdrop-blur-md hidden";
+            }, 2000);
+        }
+
+        function triggerEndgameScreen(title, msg, type = 'success') {
+            const screen = document.getElementById('permanent-end-screen');
+            const box = document.getElementById('endgame-card');
+            const titleEl = document.getElementById('endgame-title');
+            const msgEl = document.getElementById('endgame-msg');
+
+            titleEl.innerText = title;
+            msgEl.innerText = msg;
+
+            if (type === 'error') {
+                screen.className = "fixed inset-0 bg-red-950/98 z-50 flex flex-col items-center justify-center p-6 border-8 border-red-600 backdrop-blur-lg flex";
+                box.className = "text-center p-10 bg-black border-4 border-red-500 rounded-2xl shadow-2xl max-w-3xl w-full";
+                titleEl.className = "text-3xl md:text-5xl font-orbitron font-black text-red-500 tracking-widest mb-6 animate-pulse";
+                msgEl.className = "text-xl md:text-2xl font-mono text-red-300 uppercase leading-relaxed mb-8";
+            } else {
+                screen.className = "fixed inset-0 bg-emerald-950/98 z-50 flex flex-col items-center justify-center p-6 border-8 border-emerald-500 backdrop-blur-lg flex";
+                box.className = "text-center p-10 bg-black border-4 border-emerald-400 rounded-2xl shadow-2xl max-w-3xl w-full";
+                titleEl.className = "text-3xl md:text-5xl font-orbitron font-black text-emerald-400 tracking-widest mb-6 animate-pulse";
+                msgEl.className = "text-xl md:text-2xl font-mono text-emerald-200 uppercase leading-relaxed mb-8";
+            }
+        }
+
+        function updateGridVisuals() {
+            loadState();
+            let disc = 0, engineTaken = false, enginePowered = state['7b'] && state['7b'].enginePowered;
+            const allowVis = state['7b'] && state['7b'].wardenAllow7bVis;
+            
+            for (let id of [1,2,3,4,5,6,7,'7b',8,9,10]) {
+                const st = state[id];
+                const data = roomData[id];
+                const labelEl = document.getElementById(`label-${id}`);
+                const subEl = document.getElementById(`sub-${id}`);
+                const rectEl = document.querySelector(`#node-${id} rect`);
+                const nodeGroup = document.getElementById(`node-${id}`);
+
+                if (st && st.explored && id !== '7b') disc++;
+                if (st && st.engineCollected) engineTaken = true;
+
+                if (id === '7b') {
+                    if (nodeGroup) {
+                        nodeGroup.style.display = (enginePowered || allowVis) ? 'block' : 'none';
+                    }
+                    const path7b = document.getElementById('path-7b');
+                    if (path7b) path7b.style.opacity = (enginePowered || allowVis) ? '1' : '0.2';
+                }
+
+                if (labelEl && subEl && rectEl && (id !== '7b' || enginePowered || allowVis)) {
+                    if (data.code !== null && !st.unlocked) {
+                        labelEl.textContent = `${id}. [KEYPAD LOCKED]`;
+                        labelEl.setAttribute('fill', '#f59e0b');
+                        subEl.textContent = '[REQUIRES CODE]';
+                        subEl.setAttribute('fill', '#d97706');
+                        rectEl.setAttribute('stroke', '#f59e0b');
+                    } else if (!st.explored) {
+                        labelEl.textContent = id === '7b' ? '07-B CORE' : `${id}. [UNEXPLORED]`;
+                        labelEl.setAttribute('fill', id === '7b' ? '#f43f5e' : '#6b7280');
+                        subEl.textContent = id === '7b' ? '[MAINFRAME]' : '[CLICK TO SCAN]';
+                        subEl.setAttribute('fill', id === '7b' ? '#fda4af' : '#4b5563');
+                        rectEl.setAttribute('stroke', id === '7b' ? '#f43f5e' : '#374151');
+                    } else if (id === 8 && st.engineCollected) {
+                        labelEl.textContent = "08. [ENGINE SECURED]";
+                        labelEl.setAttribute('fill', '#a855f7');
+                        rectEl.setAttribute('stroke', '#a855f7');
+                    } else if (id === 10) {
+                        labelEl.textContent = "10. ESCAPE BAY";
+                        labelEl.setAttribute('fill', '#10b981');
+                        rectEl.setAttribute('stroke', '#10b981');
+                    } else {
+                        labelEl.textContent = data.name.split('. ')[1] || data.name;
+                        labelEl.setAttribute('fill', id === '7b' ? '#f43f5e' : '#22d3ee');
+                        subEl.textContent = data.sub;
+                        subEl.setAttribute('fill', id === '7b' ? '#fda4af' : '#0891b2');
+                        rectEl.setAttribute('stroke', id === '7b' ? '#f43f5e' : '#22d3ee');
+                    }
+                }
+            }
+            document.getElementById('exploration-progress').innerText = `SECTORS DISCOVERED: ${disc} / 10`;
+            document.getElementById('header-engine-status').innerText = enginePowered ? "POWERING STATION (7-B ACTIVE)" : (engineTaken ? "SECURED BY CREW" : "SECURE IN VAULT");
+            document.getElementById('header-engine-status').className = enginePowered ? "text-blue-400 font-bold animate-pulse" : (engineTaken ? "text-purple-400 font-bold" : "text-cyan-400 font-bold");
+        }
+
+        function selectRoom(id) {
+            loadState();
+            const enginePowered = state['7b'] && state['7b'].enginePowered;
+            const allowVis = state['7b'] && state['7b'].wardenAllow7bVis;
+            if (id === '7b' && (!enginePowered && !allowVis)) {
+                triggerHudPopup("ACCESS DENIED", "Sector 07-B unpowered. Plug engine into Sector 07 first!", "error");
+                return;
+            }
+
+            activeRoom = id;
+            keypadInput = "";
+            showKeypadManual = false;
+            updateKeypadDisplay();
+
+            document.querySelectorAll('.room-node').forEach(n => n.classList.remove('active'));
+            const selectedNode = document.getElementById(`node-${id}`);
+            if (selectedNode) selectedNode.classList.add('active');
+
+            renderPanelContent();
+        }
+
+        function renderPanelContent() {
+            const st = state[activeRoom];
+            const data = roomData[activeRoom];
+            const keypadPanel = document.getElementById('keypad-panel');
+            const btnReopenKeypad = document.getElementById('btn-reopen-keypad');
+            const btnExplore = document.getElementById('btn-explore');
+            const tierActions = document.getElementById('tier-actions');
+            const btnSearch = document.getElementById('btn-search');
+            const btnLog = document.getElementById('btn-log');
+            const btnPickupEngine = document.getElementById('btn-pickup-engine');
+            const btnPlugEngine = document.getElementById('btn-plug-engine');
+            const escapeUltimatum = document.getElementById('escape-ultimatum');
+
+            document.getElementById('detail-number').innerText = `SECTOR ID: ${activeRoom}`;
+            document.getElementById('badge-exp').className = `text-xs px-2.5 py-1 rounded ${st.explored ? 'bg-cyan-950 text-cyan-300 border border-cyan-700 font-bold' : 'bg-gray-950 text-gray-500 border border-gray-800 font-bold'}`;
+            document.getElementById('badge-exp').innerText = st.explored ? 'EXPLORED' : 'UNEXPLORED';
+
+            document.getElementById('badge-srch').className = `text-xs px-2.5 py-1 rounded ${st.searched ? 'bg-amber-950 text-amber-300 border border-amber-700 font-bold' : 'bg-gray-950 text-gray-500 border border-gray-800 font-bold'}`;
+            document.getElementById('badge-srch').innerText = st.searched ? 'SEARCHED' : 'UNSEARCHED';
+
+            document.getElementById('badge-log').className = `text-xs px-2.5 py-1 rounded ${st.logUnlocked ? 'bg-emerald-950 text-emerald-300 border border-emerald-700 font-bold' : 'bg-gray-950 text-gray-500 border border-gray-800 font-bold'}`;
+            document.getElementById('badge-log').innerText = st.logUnlocked ? 'LOG UNLOCKED' : 'LOG LOCKED';
+
+            if (data.code !== null && (!st.unlocked || showKeypadManual)) {
+                keypadPanel.classList.remove('hidden');
+            } else {
+                keypadPanel.classList.add('hidden');
+            }
+
+            if (data.code !== null && st.unlocked) {
+                btnReopenKeypad.classList.remove('hidden');
+            } else {
+                btnReopenKeypad.classList.add('hidden');
+            }
+
+            if (activeRoom === 8 && st.explored && st.searched && st.unlocked && st.wardenAllowPickup) {
+                btnPickupEngine.classList.remove('hidden');
+                if (st.engineCollected) {
+                    btnPickupEngine.innerText = "✓ SOVEREIGN ENGINE COLLECTED";
+                    btnPickupEngine.className = "w-full py-3 bg-gray-900 border border-gray-700 text-gray-500 font-orbitron text-sm font-bold rounded tracking-widest cursor-not-allowed";
+                } else {
+                    btnPickupEngine.innerText = "📦 PICK UP SOVEREIGN ENGINE";
+                    btnPickupEngine.className = "w-full py-3 bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg animate-pulse cursor-pointer";
+                }
+            } else {
+                btnPickupEngine.classList.add('hidden');
+            }
+
+            if (activeRoom === 7 && state[8] && state[8].engineCollected && st.unlocked && st.wardenAllowPlug) {
+                btnPlugEngine.classList.remove('hidden');
+                if (state['7b'] && state['7b'].enginePowered) {
+                    btnPlugEngine.innerText = "✓ SOVEREIGN ENGINE INTEGRATED (07-B OPEN)";
+                    btnPlugEngine.className = "w-full py-3 bg-gray-900 border border-gray-700 text-gray-500 font-orbitron text-sm font-bold rounded tracking-widest cursor-not-allowed";
+                } else {
+                    btnPlugEngine.innerText = "⚡ PLUG SOVEREIGN ENGINE INTO MAIN POWER";
+                    btnPlugEngine.className = "w-full py-3 bg-blue-950 hover:bg-blue-900 border border-blue-500 text-blue-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg animate-pulse cursor-pointer";
+                }
+            } else {
+                btnPlugEngine.classList.add('hidden');
+            }
+
+            if (activeRoom === 10 && st.explored && st.unlocked) {
+                escapeUltimatum.classList.remove('hidden');
+            } else {
+                escapeUltimatum.classList.add('hidden');
+            }
+
+            if (data.code !== null && !st.unlocked) {
+                document.getElementById('detail-name').innerText = `${activeRoom}. [SECURITY KEYPAD LOCKED]`;
+                document.getElementById('detail-env').innerText = "Door lock active. Enter valid code via security keypad.";
+                document.getElementById('detail-loot').innerText = "[ACCESS RESTRICTED]";
+                document.getElementById('log-id').innerText = "LOCKOUT ACTIVE";
+                document.getElementById('log-text').innerText = "\"Keypad security lock engaged. Authorize clearance code.\"";
+                btnExplore.classList.add('hidden');
+                tierActions.classList.add('hidden');
+                escapeUltimatum.classList.add('hidden');
+                return;
+            }
+
+            if (!st.explored) {
+                document.getElementById('detail-name').innerText = `${activeRoom}. [UNEXPLORED SECTOR]`;
+                document.getElementById('detail-env').innerText = "Door unsealed. Click 'EXPLORE SECTOR'.";
+                document.getElementById('detail-loot').innerText = "[UNEXPLORED CACHE]";
+                document.getElementById('log-id').innerText = "LOG LOCKED";
+                document.getElementById('log-text').innerText = "\"Archive data unreadable until explored.\"";
+                btnExplore.classList.remove('hidden');
+                tierActions.classList.add('hidden');
+            } else {
+                document.getElementById('detail-name').innerText = data.name;
+                document.getElementById('detail-env').innerText = data.env;
+                btnExplore.classList.add('hidden');
+                tierActions.classList.remove('hidden');
+
+                if (st.searched) {
+                    btnSearch.innerText = "✓ ITEMS SEARCHED";
+                    btnSearch.className = "w-full py-3 bg-gray-900 border border-gray-700 text-gray-500 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest shadow-inner cursor-not-allowed";
+                    document.getElementById('detail-loot').innerText = data.loot;
+                } else {
+                    btnSearch.innerText = "🔍 SEARCH ITEMS";
+                    btnSearch.className = "w-full py-3 bg-yellow-950 hover:bg-yellow-900 border border-yellow-500 text-yellow-300 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer";
+                }
+
+                if (st.logUnlocked) {
+                    btnLog.innerText = "✓ LOGS ACCESSED";
+                    btnLog.className = "w-full py-3 bg-gray-900 border border-gray-700 text-gray-500 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest shadow-inner cursor-not-allowed";
+                    document.getElementById('log-id').innerText = data.logId;
+                    document.getElementById('log-text').innerText = `"${data.log}"`;
+                } else {
+                    btnLog.innerText = "💻 ACCESS LOGS";
+                    btnLog.className = "w-full py-3 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500 text-emerald-300 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer";
+                    document.getElementById('log-id').innerText = "LOG ENCRYPTED";
+                    document.getElementById('log-text').innerText = "[CLICK 'ACCESS LOGS' TO DECRYPT]";
+                }
+            }
+        }
+
+        function toggleKeypad() {
+            showKeypadManual = !showKeypadManual;
+            renderPanelContent();
+        }
+
+        function pressKey(num) {
+            if (keypadInput.length < 4) {
+                keypadInput += num;
+                updateKeypadDisplay();
+            }
+        }
+
+        function clearKeypad() {
+            keypadInput = "";
+            updateKeypadDisplay();
+        }
+
+        function updateKeypadDisplay() {
+            const disp = document.getElementById('keypad-display');
+            if (disp) disp.innerText = keypadInput.padEnd(4, '_');
+        }
+
+        function submitKeypad() {
+            const correctCode = roomData[activeRoom].code;
+            if (keypadInput === correctCode) {
+                triggerHudPopup("ACCESS GRANTED", "SECURITY OVERRIDE AUTHORIZED", "success");
+                state[activeRoom].unlocked = true;
+                saveState();
+                updateGridVisuals();
+                showKeypadManual = false;
+                setTimeout(() => { selectRoom(activeRoom); }, 2100);
+            } else {
+                triggerHudPopup("ACCESS DENIED", "SECURITY CODE MISMATCH", "error");
+                clearKeypad();
+            }
+        }
+
+        function doExplore() {
+            state[activeRoom].explored = true;
+            saveState();
+            updateGridVisuals();
+            selectRoom(activeRoom);
+        }
+
+        function doSearch() {
+            state[activeRoom].searched = true;
+            saveState();
+            updateGridVisuals();
+            selectRoom(activeRoom);
+        }
+
+        function doLog() {
+            state[activeRoom].logUnlocked = true;
+            saveState();
+            updateGridVisuals();
+            selectRoom(activeRoom);
+        }
+
+        function pickupEngine() {
+            state[8].engineCollected = true;
+            saveState();
+            updateGridVisuals();
+            selectRoom(8);
+            triggerHudPopup("ENGINE ACQUIRED", "Sovereign Engine Core secured into inventory!", "purple");
+        }
+
+        function plugInEngine() {
+            if (!state['7b']) state['7b'] = {};
+            state['7b'].enginePowered = true;
+            state['7b'].explored = true;
+            saveState();
+            updateGridVisuals();
+            selectRoom(7);
+            triggerHudPopup("POWER SURGE", "7B IS NOW UNLOCKED", "blue");
+        }
+
+        function triggerEscape() {
+            triggerEndgameScreen("SHUTTLE LAUNCH SUCCESSFUL", "You get into the escape shuttle and launch away from Beacon 3A-r3d. The Warden has taken over terminal control.", "success");
+        }
+
+        function triggerDestruct() {
+            triggerEndgameScreen("STATION PURGE INITIATED", "You killed the mind-core and saved the human race. The Warden has taken over terminal control.", "error");
+        }
+
+        function resetExploration() {
+            const permanentEnd = document.getElementById('permanent-end-screen');
+            permanentEnd.className = "fixed inset-0 bg-black/98 z-50 flex-col items-center justify-center p-6 border-8 backdrop-blur-lg hidden";
+            resetState();
+            updateGridVisuals();
+            selectRoom(1);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
