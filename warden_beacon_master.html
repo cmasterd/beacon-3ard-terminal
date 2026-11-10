@@ -1205,7 +1205,7 @@
             panel.append(heading);
             const explanation = document.createElement('p');
             explanation.className = 'text-sm text-cyan-500';
-            explanation.textContent = 'Share this one link with all players. Enable groups 2–4 when the party splits.';
+            explanation.textContent = 'Share the player link or session code with all players. Enable groups 2–4 when the party splits.';
             panel.append(explanation);
             const linkRow = document.createElement('div');
             linkRow.className = 'flex flex-wrap gap-2 items-center';
@@ -1233,6 +1233,32 @@
             });
             linkRow.append(link, copy);
             panel.append(linkRow);
+            const codeRow = document.createElement('div');
+            codeRow.className = 'flex flex-wrap gap-2 items-center';
+            const code = document.createElement('input');
+            code.type = 'text';
+            code.readOnly = true;
+            code.value = GAME_STORAGE.playerCode;
+            code.setAttribute('aria-label', 'Player session code');
+            code.className = link.className;
+            code.addEventListener('focus', () => code.select());
+            const copyCode = document.createElement('button');
+            copyCode.type = 'button';
+            copyCode.textContent = 'COPY SESSION CODE';
+            copyCode.className = copy.className;
+            copyCode.addEventListener('click', async () => {
+                try {
+                    if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+                    await navigator.clipboard.writeText(code.value);
+                    copyCode.textContent = 'COPIED';
+                    setTimeout(() => { copyCode.textContent = 'COPY SESSION CODE'; }, 2000);
+                } catch (error) {
+                    code.focus();
+                    alert('Could not copy automatically. The code is selected; copy it manually.');
+                }
+            });
+            codeRow.append(code, copyCode);
+            panel.append(codeRow);
             for (let group = 1; group <= 4; group++) {
                 const row = document.createElement('div');
                 row.className = 'flex flex-wrap gap-2 items-center';

@@ -3,9 +3,21 @@
 \set ON_ERROR_STOP on
 begin;
 insert into auth.users(id) values ('11111111-1111-4111-8111-111111111111');
+insert into beacon_private.sessions (owner_id, join_code, shared)
+values ('11111111-1111-4111-8111-111111111111', repeat('a', 64),
+    jsonb_build_object('vad_shared_station_state_v14', beacon_private.initial_rooms()));
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 set local role authenticated;
 select set_config('test.code', public.beacon_open_warden()->>'code', true);
+select set_config('test.player_code', public.beacon_open_warden()->>'player_code', true);
+do $$
+begin
+    if current_setting('test.code') <> repeat('a', 64)
+        or current_setting('test.player_code') !~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$'
+        or public.beacon_open_warden()->>'player_code' <> current_setting('test.player_code') then
+        raise exception 'player code is not five characters or not stable';
+    end if;
+end $$;
 select public.beacon_update(current_setting('test.code'), null, 'vad_warden_notes_v1', '"PRIVATE NOTE"', 0);
 select public.beacon_update(current_setting('test.code'), null, 'vad_audio_archive_v1', '{"unlocked":[1]}', 0);
 select public.beacon_set_group(current_setting('test.code'), 2, true);
@@ -23,6 +35,17 @@ set local role anon;
 do $$
 declare session_data jsonb;
 begin
+    if public.beacon_join_player(current_setting('test.player_code'))->>'code' <> current_setting('test.code') then
+        raise exception 'player code did not resolve to the existing session';
+    end if;
+    begin
+        perform public.beacon_join_player('INVALID');
+        raise exception 'invalid player code was accepted';
+    exception when invalid_parameter_value then null; end;
+    begin
+        perform public.beacon_join_player('AAAAA' || 'A');
+        raise exception 'long player code was accepted';
+    exception when invalid_parameter_value then null; end;
     session_data := public.beacon_read_session(current_setting('test.code'), 2);
     if session_data -> 'private' <> '{}'::jsonb then raise exception 'private data exposed'; end if;
     begin

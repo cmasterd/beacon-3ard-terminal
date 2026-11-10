@@ -4,6 +4,7 @@
     const PROJECT_URL = 'https://erzvykheeffibzadmset.supabase.co';
     const PUBLIC_KEY = 'sb_publishable_tJAMHG90WUI2SNMYDXIFqQ_YeiQtXe9';
     const CONFIG_KEY = 'beacon_online_tab_v1';
+    const PLAYER_SESSION_KEY = 'beacon_player_session_v1';
     const ROOM_KEY = 'vad_shared_station_state_v14';
     const STATUS_KEY = 'vad_ship_status_v1';
     const LOG_KEY = 'vad_session_log_v1';
@@ -16,6 +17,7 @@
     let client;
     let snapshot = {};
     let info = null;
+    let playerCode = null;
     let lastEpoch = null;
     let pending = [];
     let writeRevision = 0;
@@ -147,6 +149,7 @@
         get role() { return config && config.role; },
         get group() { return config && config.group; },
         get info() { return info; },
+        get playerCode() { return playerCode; },
         getItem(key) {
             if (isRemote(key)) return serialized(snapshot[key]);
             return localStorage.getItem(localKey(key));
@@ -329,8 +332,13 @@
         if (config.role === 'warden') {
             const opened = await rpc('beacon_open_warden', {});
             if (opened.code !== config.code) throw new Error('This Warden session does not belong to the signed-in user');
+            if (!/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(opened.player_code || '')) {
+                throw new Error('Five-character session code unavailable. Update the Supabase schema first.');
+            }
+            playerCode = opened.player_code;
         }
         await refresh();
+        if (config.role === 'player') localStorage.setItem(PLAYER_SESSION_KEY, config.code);
         document.querySelectorAll('a[href^="archive.html"]').forEach(link => {
             link.dataset.beaconArchive = link.getAttribute('href');
         });

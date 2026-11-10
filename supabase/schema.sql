@@ -12,6 +12,8 @@ create table if not exists beacon_private.sessions (
     presence jsonb not null default '{}'::jsonb
 );
 alter table beacon_private.sessions add column if not exists reset_epoch bigint not null default 0;
+alter table beacon_private.sessions add column if not exists player_code text;
+create unique index if not exists beacon_sessions_player_code_idx on beacon_private.sessions (player_code);
 alter table beacon_private.sessions enable row level security;
 revoke all on all tables in schema beacon_private from public, anon, authenticated;
 
@@ -32,15 +34,52 @@ create or replace function public.beacon_open_warden()
 returns jsonb
 language plpgsql security definer set search_path = pg_catalog, beacon_private
 as $$
-declare session_row beacon_private.sessions%rowtype;
+declare
+    session_row beacon_private.sessions%rowtype;
+    alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    random_bits bigint;
+    candidate text;
+    i integer;
 begin
     if auth.uid() is null then raise exception 'Warden login required' using errcode = '42501'; end if;
     insert into beacon_private.sessions (owner_id, join_code, shared)
     values (auth.uid(), replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
         jsonb_build_object('vad_shared_station_state_v14', beacon_private.initial_rooms()))
     on conflict (owner_id) do nothing;
-    select * into session_row from beacon_private.sessions where owner_id = auth.uid();
-    return jsonb_build_object('code', session_row.join_code);
+    select * into session_row from beacon_private.sessions where owner_id = auth.uid() for update;
+    if session_row.player_code is null then
+        loop
+            random_bits := ('x' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 7))::bit(28)::bigint;
+            candidate := '';
+            for i in 0..4 loop
+                candidate := candidate || substr(alphabet, ((random_bits >> (i * 5)) & 31)::integer + 1, 1);
+            end loop;
+            begin
+                update beacon_private.sessions set player_code = candidate
+                where owner_id = auth.uid();
+                exit;
+            exception when unique_violation then
+                continue;
+            end;
+        end loop;
+        session_row.player_code := candidate;
+    end if;
+    return jsonb_build_object('code', session_row.join_code, 'player_code', session_row.player_code);
+end;
+$$;
+
+create or replace function public.beacon_join_player(p_player_code text)
+returns jsonb
+language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+declare session_code text;
+begin
+    if p_player_code is null or p_player_code !~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$' then
+        raise exception 'Invalid session code' using errcode = '22023';
+    end if;
+    select join_code into session_code from beacon_private.sessions where player_code = p_player_code;
+    if not found then raise exception 'Session code not found' using errcode = '42501'; end if;
+    return jsonb_build_object('code', session_code);
 end;
 $$;
 
@@ -330,6 +369,7 @@ $$;
 
 -- Only these RPCs are exposed; policies and client-side UI are not the access boundary.
 revoke all on function public.beacon_open_warden() from public, anon;
+revoke all on function public.beacon_join_player(text) from public;
 revoke all on function public.beacon_read_session(text, integer) from public;
 revoke all on function public.beacon_set_group(text, integer, boolean) from public, anon;
 revoke all on function public.beacon_focus(text, integer, text) from public;
@@ -339,6 +379,7 @@ revoke all on function public.beacon_clear_log(text, bigint) from public, anon;
 revoke all on function public.beacon_restore(text, jsonb) from public, anon;
 revoke all on function public.beacon_reset(text) from public, anon;
 grant execute on function public.beacon_open_warden() to authenticated;
+grant execute on function public.beacon_join_player(text) to anon, authenticated;
 grant execute on function public.beacon_read_session(text, integer) to anon, authenticated;
 grant execute on function public.beacon_set_group(text, integer, boolean) to authenticated;
 grant execute on function public.beacon_focus(text, integer, text) to anon, authenticated;
