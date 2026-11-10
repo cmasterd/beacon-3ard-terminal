@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONLINE WARDEN LOGIN // BEACON 3A-R3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Share Tech Mono', monospace; background: #050203; } h1 { font-family: Orbitron, sans-serif; }</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6 text-rose-200">
+    <main class="w-full max-w-md border border-rose-700 bg-gray-950 rounded p-6">
+        <h1 class="text-xl text-rose-400 font-bold tracking-widest">ONLINE WARDEN ACCESS</h1>
+        <p class="mt-3 text-sm text-rose-300">Sign in with the Warden account created in Supabase. Player group links are available inside the Warden terminal.</p>
+        <form id="login" class="mt-6 space-y-4">
+            <label class="block">Email
+                <input id="email" type="email" autocomplete="username" required class="block w-full mt-1 p-2 text-white bg-black border border-rose-800 rounded">
+            </label>
+            <label class="block">Password
+                <input id="password" type="password" autocomplete="current-password" required class="block w-full mt-1 p-2 text-white bg-black border border-rose-800 rounded">
+            </label>
+            <button type="submit" class="w-full p-3 bg-rose-950 hover:bg-rose-900 border border-rose-600 rounded font-bold">SIGN IN</button>
+        </form>
+        <p id="message" role="status" class="mt-4 text-amber-300"></p>
+        <a href="index.html" class="inline-block mt-5 text-rose-400 underline">Return to gateway</a>
+    </main>
+    <script src="online.js"></script>
+    <script>
+        document.getElementById('login').addEventListener('submit', async event => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const message = document.getElementById('message');
+            const button = form.querySelector('button');
+            button.disabled = true;
+            message.textContent = 'SIGNING IN...';
+            try {
+                const client = await BEACON_ONLINE.getClient();
+                const result = await client.auth.signInWithPassword({
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                });
+                if (result.error) throw result.error;
+                document.getElementById('password').value = '';
+                const session = await BEACON_ONLINE.rpc('beacon_open_warden', {});
+                const url = new URL('warden_beacon_master.html', location.href);
+                url.hash = new URLSearchParams({ beacon_session: session.code, role: 'warden' }).toString();
+                location.href = url.href;
+            } catch (error) {
+                message.textContent = 'SIGN IN FAILED: ' + error.message;
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

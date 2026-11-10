@@ -111,6 +111,7 @@
         </div>
     </div>
 
+    <script src="online.js"></script>
     <script src="logs.js"></script>
     <script>
         // Log content lives in logs.js (shared with the Warden and player pages).
@@ -123,7 +124,7 @@
 
         function readUnlocked(kind) {
             try {
-                const parsed = JSON.parse(localStorage.getItem(ARCHIVE[kind].key) || '{}');
+                const parsed = JSON.parse(GAME_STORAGE.getItem(ARCHIVE[kind].key) || '{}');
                 return Array.isArray(parsed.unlocked) ? parsed.unlocked : [];
             } catch (e) {
                 return [];
@@ -141,7 +142,7 @@
 
         function readRevealed() {
             try {
-                const parsed = JSON.parse(localStorage.getItem(REVEALED_KEY) || '[]');
+                const parsed = JSON.parse(GAME_STORAGE.getItem(REVEALED_KEY) || '[]');
                 return Array.isArray(parsed) ? parsed : [];
             } catch (e) {
                 return [];
@@ -161,7 +162,7 @@
                 pre.title = '';
                 return;
             }
-            localStorage.setItem(REVEALED_KEY, JSON.stringify([...seen, log.id]));
+            GAME_STORAGE.setItem(REVEALED_KEY, JSON.stringify([...seen, log.id]));
             pre.title = 'Click to skip';
             let i = 0;
             const step = Math.max(1, Math.ceil(log.body.length / 400));
@@ -207,7 +208,7 @@
 
         function renderSection(kind) {
             const cfg = ARCHIVE[kind];
-            const raw = localStorage.getItem(cfg.key) || '';
+            const raw = GAME_STORAGE.getItem(cfg.key) || '';
             if (raw === lastSerialized[kind]) return;
             lastSerialized[kind] = raw;
 
@@ -272,9 +273,16 @@
             Object.keys(ARCHIVE).forEach(renderSection);
         }
 
-        renderAll();
-        window.addEventListener('storage', renderAll);
-        setInterval(renderAll, 800);
+        window.addEventListener('load', async () => {
+            try {
+                await BEACON_ONLINE.start();
+                renderAll();
+                window.addEventListener('storage', renderAll);
+                setInterval(renderAll, 800);
+            } catch (error) {
+                BEACON_ONLINE.showStartupError(error);
+            }
+        });
     </script>
 </body>
 </html>

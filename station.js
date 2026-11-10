@@ -15,7 +15,7 @@
 
     function readJson(key) {
         try {
-            const parsed = JSON.parse(localStorage.getItem(key) || '{}');
+            const parsed = JSON.parse(GAME_STORAGE.getItem(key) || '{}');
             return parsed && typeof parsed === 'object' ? parsed : {};
         } catch (e) {
             return {};
@@ -40,13 +40,13 @@
     }
 
     function writeStatus(status) {
-        localStorage.setItem(STATUS_KEY, JSON.stringify(status));
+        GAME_STORAGE.setItem(STATUS_KEY, JSON.stringify(status));
     }
 
     function setHazard(room, hazard) {
         const hazards = readHazards();
         if (hazard) hazards[room] = hazard; else delete hazards[room];
-        localStorage.setItem(HAZARD_KEY, JSON.stringify(hazards));
+        GAME_STORAGE.setItem(HAZARD_KEY, JSON.stringify(hazards));
     }
 
     // Idempotent: safe to call on every poll. prefix is "node" (player) or "warden-node".
@@ -84,16 +84,17 @@
     document.head.append(style);
 
     function logEvent(source, text) {
+        if (GAME_STORAGE.logEvent(source, text)) return;
         let log = [];
-        try { log = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { log = []; }
+        try { log = JSON.parse(GAME_STORAGE.getItem(LOG_KEY) || '[]'); } catch (e) { log = []; }
         if (!Array.isArray(log)) log = [];
         log.push({ t: Date.now(), s: source, m: String(text) });
-        localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(-300)));
+        GAME_STORAGE.setItem(LOG_KEY, JSON.stringify(log.slice(-300)));
     }
 
     function readLog() {
         try {
-            const log = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+            const log = JSON.parse(GAME_STORAGE.getItem(LOG_KEY) || '[]');
             return Array.isArray(log) ? log : [];
         } catch (e) {
             return [];

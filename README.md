@@ -13,7 +13,26 @@ All log content (titles, descriptions, file paths, text bodies, `public` flags) 
 
 `audio/log-01.mp3` to `log-05.mp3` are generated placeholders: Windows text-to-speech plus ffmpeg effects. The Dr. Vane scripts are in `tools/make-audio.ps1` (Windows PowerShell, needs ffmpeg on the PATH). Edit them and re-run `powershell -ExecutionPolicy Bypass -File tools\make-audio.ps1`, or overwrite the mp3s with real recordings.
 
-Both pages share scenario progress through the browser's `localStorage`. Open them in the same browser and serve them from the same origin to keep the terminals synchronized.
+In local mode the pages share scenario progress through the browser's `localStorage`. Open them in the same browser and serve them from the same origin. Online mode can also synchronize an independent session across devices through Supabase.
+
+## Online sessions and split groups
+
+The Warden signs in through **Online Warden Login** on the gateway using the account created in the Supabase project. Share the single player link with everyone, including the shared table touchscreen. Group 1 is always enabled; turn groups 2, 3 and 4 on when the party splits. Each newly enabled or re-enabled group starts at Group 1's current sector, or sector 1 if Group 1 hasn't selected a sector yet. Players select an enabled group on any player device, then select a sector to move that group's marker. Multiple devices can control the same group; the last sector selection wins. Disabling a group hides its marker and returns any affected player device to Group 1.
+
+Station progress, hazards, status, broadcasts, countdown and archive unlocks are shared. Numbered coloured markers on both maps show active groups' last selected sectors. They remain visible when players switch groups or disconnect; they are not device-presence indicators. The archive follows the player's session when opened from their terminal. Sound and each device's alert/reveal history remain local. Online updates are polled about every two seconds.
+
+The status banner reports pending or failed writes. If the connection fails, keep the tab open while it retries; unsent changes are not guaranteed to survive closing the tab. A failed write can be discarded explicitly using the banner's reload control. Resetting or restoring the session rejects writes from before the reset; affected devices must discard stale pending changes and reload. Online reset is Warden-only and preserves Warden notes and group settings. Backup export and restore work from the online Warden terminal; importing a local backup replaces the online session.
+
+The player link contains a secret join code: share it only with your players. Anyone with the link can act as a player in any enabled group, so group assignment is not an individual identity check. The Warden login and database permissions protect online Warden-only controls and notes, but not the scenario content itself: the static website, its Warden page, codes and log contents remain public.
+
+### Supabase setup
+
+1. Create a Supabase project and manually create an email/password Warden user in **Authentication → Users**. Confirm that user. Consider disabling public user sign-ups in Authentication settings while keeping email/password sign-in enabled.
+2. In the Supabase **SQL Editor**, run the complete contents of [`supabase/schema.sql`](supabase/schema.sql). It creates private tables with row-level security and functions that authorize player and Warden access. Re-running it preserves existing sessions.
+3. `online.js` is configured with this project's URL and publishable key. These are public client configuration, not administrative credentials. Never put a database password, secret key or service-role key in the site or backup.
+4. Open the gateway, choose **Online Warden Login**, sign in, and share the single player link. Enable additional groups as needed. The online station starts separately from local progress; use Backup & Restore to import an existing local backup if desired.
+
+An internet connection is required. Supabase can pause an inactive free project; restore it from its dashboard before play if needed. The Warden's **Exit Online Session** signs out on that browser. Each Warden account has one persistent online station.
 
 ## Run locally
 
@@ -34,7 +53,7 @@ The pages use Tailwind CSS and fonts from CDNs, so an internet connection is nee
 
 ## Progress and reset
 
-Progress is saved in the browser and shared between both terminals on the same origin. Use the reset control in the Warden terminal to clear station progress, archive unlocks, alert memory, any active broadcast and the countdown (it asks for confirmation).
+In local mode, progress is saved in the browser and shared between terminals on the same origin. Use the reset control in the Warden terminal to clear station progress, archive unlocks, alert memory, any active broadcast and the countdown (it asks for confirmation).
 
 An emergency broadcast (typed or preset) appears as a red banner on the player terminal until the player dismisses it or the Warden clears it.
 
@@ -46,24 +65,24 @@ In a room's detail panel the Warden can set a **Sector Hazard** (vacuum, fire, r
 
 The player terminal opens with a login screen once per browser tab: a rotating laser-style VAD logo and a **LOGIN** button. Pressing it runs a slow boot sequence (about 8 seconds, with a SKIP button) before the terminal appears; the login click also counts as the click browsers need before audio can play. The screen briefly glitches on broadcasts, log unlocks and countdown expiry, and locked archive entries flicker. Both effects honour the system "reduce motion" setting.
 
-The player terminal has a **SOUND** button (header). When on, it plays a chime when a log unlocks, an alarm for broadcasts and a siren when the countdown expires. Browsers only allow audio after a click, so press the button (or click anywhere on the page) once after each page load. Browser storage is local to that browser profile; it is not synchronized between devices.
+The player terminal has a **SOUND** button (header). When on, it plays a chime when a log unlocks, an alarm for broadcasts and a siren when the countdown expires. Browsers only allow audio after a click, so press the button (or click anywhere on the page) once after each page load. The sound setting stays local to the browser profile.
 
 The player terminal has a **FULLSCREEN** button (or press `F`) for a cleaner view on the second monitor.
 
 Unlocked text logs show an **Open Document** button on the archive page. It opens a popup (close with the button, `Esc` or a click outside) where the text types itself out the first time it is opened (click the text to skip); afterwards, and with "reduce motion", it appears at once.
 
-The Warden schematic also shows a live **players-here marker**: a pulsing cyan outline and "PLAYERS HERE" tag on whichever sector the player terminal currently has selected, with a "PLAYERS VIEWING" readout under the map. It updates about twice a second and is not cleared by a station reset.
+In local mode the Warden schematic shows a **players-here marker** on the selected sector. In online mode it shows numbered markers for active groups, as described above. Locations are not cleared by a station reset.
 
 ## Warden session log, notes and backup
 
-The Warden terminal records a timestamped **Session Log** of player actions (explore, search, keypad attempts, engine, escape, self-destruct) and Warden actions (broadcasts, unlocks, hazards, status changes, countdown, resets), with Copy and Clear buttons. A station reset clears the log. **Warden Notes** is a private scratchpad that autosaves and survives a station reset.
+The Warden terminal records a timestamped **Session Log** of player actions (sector movement, explore, search, keypad attempts, engine, escape, self-destruct) and Warden actions (broadcasts, unlocks, hazards, status changes, countdown, resets), with Copy and Clear buttons. New online player entries include the group selected when the action was performed; older entries and local-mode entries remain labelled PLAYER. Switching groups or selecting the same sector again does not record a move. A station reset clears the log. **Warden Notes** is a private scratchpad that autosaves and survives a station reset.
 
 **Backup & Restore** downloads all game state (progress, unlocks, status, hazards, log, notes) as a JSON file, and can restore it later; restoring replaces current state and reloads the page. Sound preference is not included.
 
 ## Warden access code
 
-The Warden terminal opens with a keypad. The code is `1337` (change `WARDEN_CODE` in `warden_beacon_master.html`). It stays unlocked for the rest of that browser tab. This is a client-side gate to keep players out of the GM view; anyone who reads the page source can see the code.
+The local Warden terminal opens with a keypad. The code is `1337` (change `WARDEN_CODE` in `warden_beacon_master.html`). It stays unlocked for the rest of that browser tab. This is a client-side gate to keep players out of the GM view; anyone who reads the page source can see the code. Online Warden control instead requires the Supabase email/password login.
 
 ## Hosting (GitHub Pages)
 
-The site is published with GitHub Pages at <https://cmasterd.github.io/beacon-3ard-terminal/index.html> and updates when `master` is pushed. Everything in the repo is public, including the Warden page, its master keypad codes and the `1337` access code, so players who find the URL or read the page source can spoil the game. Share only the player link with players. Static hosting also does not sync devices: the player and Warden terminals must be open in the same browser (same origin), as described above.
+The site is published with GitHub Pages at <https://cmasterd.github.io/beacon-3ard-terminal/index.html> and updates when `master` is pushed. Everything in the repo is public, including the Warden page, its master keypad codes and the `1337` access code, so players who find the URL or read the page source can spoil the game. Static hosting alone does not sync devices; online mode uses the separately configured Supabase project.

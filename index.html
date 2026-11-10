@@ -56,6 +56,7 @@
     </style>
 </head>
 <body class="min-h-screen flex flex-col relative p-4 md:p-8">
+    <script>sessionStorage.removeItem('beacon_online_tab_v1');</script>
     <div class="crt-overlay"></div>
     <div class="scanline"></div>
 
@@ -83,7 +84,8 @@
             <div class="text-center mb-8 md:mb-12">
                 <p class="text-xs text-cyan-700 tracking-[0.35em]">AUTHORIZED ACCESS ONLY</p>
                 <h2 class="font-orbitron font-bold text-xl md:text-2xl text-cyan-100 tracking-wider mt-3">CHOOSE AN INTERFACE</h2>
-                <p class="text-sm text-gray-400 mt-3">Player, Warden, and archive pages share progress in the same browser.</p>
+                <p class="text-sm text-gray-400 mt-3">Choose local play in one browser, or sign in for an online session across devices.</p>
+                <a href="online.html" class="inline-block mt-5 px-5 py-3 bg-rose-950 border border-rose-500 text-rose-200 hover:bg-rose-900 rounded font-bold">ONLINE WARDEN LOGIN →</a>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">

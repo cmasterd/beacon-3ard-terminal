@@ -328,6 +328,7 @@
         </div>
     </section>
 
+    <script src="online.js"></script>
     <script src="logs.js"></script>
     <script src="station.js"></script>
     <script>
@@ -445,7 +446,7 @@
             selectRoom(activeRoom);
 
             setInterval(() => {
-                const currentStored = localStorage.getItem(STORAGE_KEY);
+                const currentStored = GAME_STORAGE.getItem(STORAGE_KEY);
                 if (currentStored && currentStored !== lastSerializedState) {
                     loadState();
                     updateGridVisuals();
@@ -455,7 +456,7 @@
         }
 
         function loadState() {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const saved = GAME_STORAGE.getItem(STORAGE_KEY);
             if (saved) {
                 state = JSON.parse(saved);
                 lastSerializedState = saved;
@@ -466,7 +467,7 @@
 
         function saveState() {
             const serialized = JSON.stringify(state);
-            localStorage.setItem(STORAGE_KEY, serialized);
+            GAME_STORAGE.setItem(STORAGE_KEY, serialized, lastSerializedState);
             lastSerializedState = serialized;
         }
 
@@ -685,20 +686,20 @@
         function sendBroadcast(text) {
             text = text.trim();
             if (!text) return;
-            localStorage.setItem(BROADCAST_KEY, JSON.stringify({ id: Date.now(), text }));
+            GAME_STORAGE.setItem(BROADCAST_KEY, JSON.stringify({ id: Date.now(), text }));
             STATION.logEvent('WARDEN', `Broadcast: ${text}`);
             renderBroadcastStatus();
         }
 
         function clearBroadcast() {
-            localStorage.removeItem(BROADCAST_KEY);
+            GAME_STORAGE.removeItem(BROADCAST_KEY);
             STATION.logEvent('WARDEN', 'Broadcast cleared');
             renderBroadcastStatus();
         }
 
         function renderBroadcastStatus() {
             let text = '';
-            try { text = (JSON.parse(localStorage.getItem(BROADCAST_KEY) || 'null') || {}).text || ''; } catch (e) {}
+            try { text = (JSON.parse(GAME_STORAGE.getItem(BROADCAST_KEY) || 'null') || {}).text || ''; } catch (e) {}
             const el = document.getElementById('broadcast-status');
             el.textContent = text ? `LIVE: ${text}` : 'NO ACTIVE BROADCAST';
             el.className = `text-[10px] font-mono ${text ? 'text-red-400' : 'text-rose-700'}`;
@@ -708,7 +709,7 @@
 
         function readCountdown() {
             try {
-                const c = JSON.parse(localStorage.getItem(COUNTDOWN_KEY) || 'null');
+                const c = JSON.parse(GAME_STORAGE.getItem(COUNTDOWN_KEY) || 'null');
                 return c && c.id ? c : null;
             } catch (e) {
                 return null;
@@ -727,7 +728,7 @@
         function startCountdown(label, minutes) {
             const ms = Math.round(minutes * 60000);
             if (!(ms > 0)) return;
-            localStorage.setItem(COUNTDOWN_KEY, JSON.stringify({ id: Date.now(), label: label.trim() || 'COUNTDOWN', endsAt: Date.now() + ms, paused: false, remainingMs: ms }));
+            GAME_STORAGE.setItem(COUNTDOWN_KEY, JSON.stringify({ id: Date.now(), label: label.trim() || 'COUNTDOWN', endsAt: Date.now() + ms, paused: false, remainingMs: ms }));
             STATION.logEvent('WARDEN', `Countdown started: ${label.trim() || 'COUNTDOWN'} (${formatClock(ms)})`);
             renderCountdownStatus();
         }
@@ -742,13 +743,13 @@
                 c.remainingMs = countdownRemaining(c);
                 c.paused = true;
             }
-            localStorage.setItem(COUNTDOWN_KEY, JSON.stringify(c));
+            GAME_STORAGE.setItem(COUNTDOWN_KEY, JSON.stringify(c));
             STATION.logEvent('WARDEN', `Countdown ${c.paused ? 'paused' : 'resumed'} at ${formatClock(countdownRemaining(c))}`);
             renderCountdownStatus();
         }
 
         function clearCountdown() {
-            localStorage.removeItem(COUNTDOWN_KEY);
+            GAME_STORAGE.removeItem(COUNTDOWN_KEY);
             STATION.logEvent('WARDEN', 'Countdown cleared');
             renderCountdownStatus();
         }
@@ -776,11 +777,18 @@
         setInterval(renderCountdownStatus, 500);
 
         // Full reset: station state plus archive unlocks, alert memory and broadcasts.
-        function resetStation() {
+        async function resetStation() {
             if (!confirm('Reset ALL station data, archive unlocks and broadcasts?')) return;
+            if (GAME_STORAGE.online) {
+                try {
+                    await GAME_STORAGE.reset();
+                    location.reload();
+                } catch (error) { alert('Online reset failed: ' + error.message); }
+                return;
+            }
             resetAllState();
-            Object.values(ARCHIVE).forEach(cfg => { localStorage.removeItem(cfg.key); localStorage.removeItem(cfg.notifiedKey); });
-            [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY, STATION.LOG_KEY, 'vad_text_revealed_v1'].forEach(k => localStorage.removeItem(k));
+            Object.values(ARCHIVE).forEach(cfg => { GAME_STORAGE.removeItem(cfg.key); GAME_STORAGE.removeItem(cfg.notifiedKey); });
+            [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY, STATION.LOG_KEY, 'vad_text_revealed_v1'].forEach(k => GAME_STORAGE.removeItem(k));
             STATION.logEvent('WARDEN', 'Station reset');
             renderSessionLog();
             STATION.applyHazards('warden-node');
@@ -802,7 +810,7 @@
 
         function readUnlocked(kind) {
             try {
-                const parsed = JSON.parse(localStorage.getItem(ARCHIVE[kind].key) || '{}');
+                const parsed = JSON.parse(GAME_STORAGE.getItem(ARCHIVE[kind].key) || '{}');
                 return Array.isArray(parsed.unlocked) ? parsed.unlocked : [];
             } catch (e) {
                 return [];
@@ -810,7 +818,7 @@
         }
 
         function writeUnlocked(kind, ids) {
-            localStorage.setItem(ARCHIVE[kind].key, JSON.stringify({ unlocked: ids }));
+            GAME_STORAGE.setItem(ARCHIVE[kind].key, JSON.stringify({ unlocked: ids }));
             renderArchiveControls(kind);
         }
 
@@ -920,6 +928,10 @@
 
         (function setupLock() {
             const screen = document.getElementById('lock-screen');
+            if (GAME_STORAGE.online && GAME_STORAGE.role === 'warden') {
+                screen.classList.add('hidden');
+                return;
+            }
             if (sessionStorage.getItem(WARDEN_AUTH_KEY) === '1') {
                 screen.classList.add('hidden');
                 return;
@@ -961,7 +973,7 @@
         }
 
         function resetShipStatus() {
-            localStorage.removeItem(STATION.STATUS_KEY);
+            GAME_STORAGE.removeItem(STATION.STATUS_KEY);
             STATION.logEvent('WARDEN', 'Ship status reset to defaults');
             renderStatusControls();
         }
@@ -1011,8 +1023,14 @@
 
         let lastLogRaw = null;
 
+        function logSource(entry) {
+            return entry.s === 'PLAYER' && Number.isInteger(entry.group) && entry.group >= 1 && entry.group <= 4
+                ? `PLAYER · GROUP ${entry.group}`
+                : entry.s;
+        }
+
         function renderSessionLog() {
-            const raw = localStorage.getItem(STATION.LOG_KEY) || '';
+            const raw = GAME_STORAGE.getItem(STATION.LOG_KEY) || '';
             if (raw === lastLogRaw) return;
             lastLogRaw = raw;
             const list = document.getElementById('session-log');
@@ -1033,7 +1051,7 @@
                 time.textContent = new Date(e.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' ';
                 const who = document.createElement('span');
                 who.className = e.s === 'PLAYER' ? 'text-cyan-400' : 'text-amber-400';
-                who.textContent = `[${e.s}] `;
+                who.textContent = `[${logSource(e)}] `;
                 li.append(time, who, document.createTextNode(e.m));
                 list.append(li);
             });
@@ -1042,12 +1060,12 @@
 
         function clearSessionLog() {
             if (!confirm('Clear the session log?')) return;
-            localStorage.removeItem(STATION.LOG_KEY);
+            GAME_STORAGE.removeItem(STATION.LOG_KEY);
             renderSessionLog();
         }
 
         function copySessionLog() {
-            const text = STATION.readLog().map(e => `${new Date(e.t).toLocaleTimeString()} [${e.s}] ${e.m}`).join('\n');
+            const text = STATION.readLog().map(e => `${new Date(e.t).toLocaleTimeString()} [${logSource(e)}] ${e.m}`).join('\n');
             const btn = document.getElementById('log-copy-btn');
             const done = ok => { btn.textContent = ok ? 'COPIED' : 'COPY FAILED'; setTimeout(() => { btn.textContent = 'COPY'; }, 1500); };
             if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => done(true), () => done(false));
@@ -1059,35 +1077,47 @@
         function setupNotes() {
             const box = document.getElementById('warden-notes');
             const status = document.getElementById('notes-status');
-            box.value = localStorage.getItem(STATION.NOTES_KEY) || '';
+            box.value = GAME_STORAGE.getItem(STATION.NOTES_KEY) || '';
             box.addEventListener('input', () => {
                 status.textContent = 'SAVING...';
                 clearTimeout(notesTimer);
-                notesTimer = setTimeout(() => {
-                    localStorage.setItem(STATION.NOTES_KEY, box.value);
-                    status.textContent = 'AUTOSAVED';
+                notesTimer = setTimeout(async () => {
+                    const value = box.value;
+                    GAME_STORAGE.setItem(STATION.NOTES_KEY, value);
+                    await GAME_STORAGE.waitForSync();
+                    if (box.value === value) status.textContent = 'AUTOSAVED';
                 }, 400);
             });
         }
 
-        function clearNotes() {
+        async function clearNotes() {
             if (!confirm('Clear all Warden notes?')) return;
             clearTimeout(notesTimer);
-            localStorage.removeItem(STATION.NOTES_KEY);
+            GAME_STORAGE.removeItem(STATION.NOTES_KEY);
             document.getElementById('warden-notes').value = '';
-            document.getElementById('notes-status').textContent = 'AUTOSAVED';
+            document.getElementById('notes-status').textContent = 'SAVING...';
+            await GAME_STORAGE.waitForSync();
+            if (!document.getElementById('warden-notes').value) document.getElementById('notes-status').textContent = 'AUTOSAVED';
         }
 
         // Backups cover every vad_ key except the per-device sound preference.
         const BACKUP_SKIP = ['vad_sound_v1'];
 
         function backupKeys() {
-            return Object.keys(localStorage).filter(k => k.startsWith('vad_') && !BACKUP_SKIP.includes(k));
+            return GAME_STORAGE.keys().filter(k => k.startsWith('vad_') && !BACKUP_SKIP.includes(k));
         }
 
-        function exportBackup() {
+        async function exportBackup() {
+            if (GAME_STORAGE.online) {
+                document.getElementById('backup-status').textContent = 'WAITING FOR ONLINE SYNC...';
+                try { await GAME_STORAGE.syncNow(); }
+                catch (error) {
+                    document.getElementById('backup-status').textContent = 'EXPORT FAILED: ' + error.message;
+                    return;
+                }
+            }
             const data = {};
-            backupKeys().forEach(k => { data[k] = localStorage.getItem(k); });
+            backupKeys().forEach(k => { data[k] = GAME_STORAGE.getItem(k); });
             const payload = { app: 'beacon-3ard-terminal', version: 1, exportedAt: new Date().toISOString(), data };
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1104,7 +1134,7 @@
         function importBackup(file) {
             const status = document.getElementById('backup-status');
             const reader = new FileReader();
-            reader.onload = () => {
+            reader.onload = async () => {
                 let payload;
                 try { payload = JSON.parse(reader.result); } catch (e) { payload = null; }
                 const data = payload && payload.app === 'beacon-3ard-terminal' && payload.data;
@@ -1114,9 +1144,16 @@
                 }
                 const entries = Object.entries(data).filter(([k, v]) => k.startsWith('vad_') && !BACKUP_SKIP.includes(k) && typeof v === 'string');
                 if (!confirm(`Replace the current session with this backup (${entries.length} items)?`)) return;
-                backupKeys().forEach(k => localStorage.removeItem(k));
-                entries.forEach(([k, v]) => localStorage.setItem(k, v));
-                location.reload();
+                try {
+                    if (GAME_STORAGE.online) await GAME_STORAGE.restore(entries);
+                    else {
+                        backupKeys().forEach(k => GAME_STORAGE.removeItem(k));
+                        entries.forEach(([k, v]) => GAME_STORAGE.setItem(k, v));
+                    }
+                    location.reload();
+                } catch (error) {
+                    status.textContent = 'IMPORT FAILED: ' + error.message;
+                }
             };
             reader.onerror = () => { status.textContent = 'IMPORT FAILED: COULD NOT READ FILE'; };
             reader.readAsText(file);
@@ -1129,10 +1166,14 @@
 
         // Shows where the player terminal is currently looking, from the focus key the player page writes.
         function renderPlayerFocus() {
+            if (GAME_STORAGE.online) {
+                renderOnlineFocus();
+                return;
+            }
             const group = document.getElementById('player-focus');
             const label = document.getElementById('player-focus-label');
             let room = null;
-            try { room = (JSON.parse(localStorage.getItem(STATION.FOCUS_KEY)) || {}).room || null; } catch (e) { room = null; }
+            try { room = (JSON.parse(GAME_STORAGE.getItem(STATION.FOCUS_KEY)) || {}).room || null; } catch (e) { room = null; }
             const node = room && document.getElementById(`warden-node-${room}`);
             if (!node) {
                 group.style.display = 'none';
@@ -1154,8 +1195,152 @@
             label.textContent = `👁 PLAYERS VIEWING: SECTOR ${room.toUpperCase()}`;
         }
 
-        window.onload = () => {
+        function setupOnlineGroups() {
+            if (!GAME_STORAGE.online || GAME_STORAGE.role !== 'warden') return;
+            const panel = document.createElement('section');
+            panel.className = 'my-4 p-4 bg-black border border-cyan-800 rounded space-y-3';
+            const heading = document.createElement('h2');
+            heading.className = 'font-orbitron text-cyan-300 font-bold';
+            heading.textContent = 'ONLINE PLAYER GROUPS';
+            panel.append(heading);
+            const explanation = document.createElement('p');
+            explanation.className = 'text-sm text-cyan-500';
+            explanation.textContent = 'Share this one link with all players. Enable groups 2–4 when the party splits.';
+            panel.append(explanation);
+            const linkRow = document.createElement('div');
+            linkRow.className = 'flex flex-wrap gap-2 items-center';
+            const link = document.createElement('input');
+            link.type = 'text';
+            link.readOnly = true;
+            link.value = GAME_STORAGE.link('player_beacon_blueprint.html', 'player');
+            link.setAttribute('aria-label', 'Shared player invitation link');
+            link.className = 'flex-grow min-w-0 p-1 bg-gray-950 border border-cyan-900 text-cyan-200 text-xs';
+            link.addEventListener('focus', () => link.select());
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.textContent = 'COPY PLAYER LINK';
+            copy.className = 'px-2 py-1 border border-cyan-800 text-cyan-200 text-xs';
+            copy.addEventListener('click', async () => {
+                try {
+                    if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+                    await navigator.clipboard.writeText(link.value);
+                    copy.textContent = 'COPIED';
+                    setTimeout(() => { copy.textContent = 'COPY PLAYER LINK'; }, 2000);
+                } catch (error) {
+                    link.focus();
+                    alert('Could not copy automatically. The link is selected; copy it manually.');
+                }
+            });
+            linkRow.append(link, copy);
+            panel.append(linkRow);
+            for (let group = 1; group <= 4; group++) {
+                const row = document.createElement('div');
+                row.className = 'flex flex-wrap gap-2 items-center';
+                const label = document.createElement('label');
+                label.className = 'text-cyan-200';
+                const toggle = document.createElement('input');
+                toggle.type = 'checkbox';
+                toggle.id = `online-group-${group}`;
+                toggle.disabled = group === 1;
+                toggle.addEventListener('change', async () => {
+                    toggle.disabled = true;
+                    try { await GAME_STORAGE.setGroup(group, toggle.checked); }
+                    catch (error) {
+                        alert('Could not update group: ' + error.message);
+                        toggle.checked = !toggle.checked;
+                    } finally { toggle.disabled = false; }
+                });
+                label.append(toggle, document.createTextNode(` GROUP ${group}`));
+                row.append(label);
+                panel.append(row);
+            }
+            const exit = document.createElement('button');
+            exit.type = 'button';
+            exit.textContent = 'EXIT ONLINE SESSION';
+            exit.className = 'px-2 py-1 border border-rose-700 text-rose-300';
+            exit.addEventListener('click', async () => {
+                await GAME_STORAGE.waitForSync();
+                try {
+                    await BEACON_ONLINE.signOut();
+                    BEACON_ONLINE.clear();
+                    location.href = 'index.html';
+                } catch (error) { alert('Could not sign out: ' + error.message); }
+            });
+            panel.append(exit);
+            document.querySelector('main').before(panel);
+            window.addEventListener('beacon-sync', updateOnlineGroups);
+            updateOnlineGroups();
+        }
+
+        function updateOnlineGroups() {
+            if (!GAME_STORAGE.info) return;
+            for (let group = 1; group <= 4; group++) {
+                const toggle = document.getElementById(`online-group-${group}`);
+                if (toggle && !toggle.disabled) toggle.checked = !!GAME_STORAGE.info.groups[group];
+                if (toggle && group === 1) toggle.checked = true;
+            }
+        }
+
+        function renderOnlineFocus() {
+            document.getElementById('player-focus').style.display = 'none';
+            const info = GAME_STORAGE.info;
+            if (!info) return;
+            const svg = document.querySelector('#warden-node-1').ownerSVGElement;
+            let layer = document.getElementById('online-focus-layer');
+            if (!layer) {
+                layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                layer.id = 'online-focus-layer';
+                layer.setAttribute('pointer-events', 'none');
+                svg.append(layer);
+            }
+            layer.replaceChildren();
+            const colors = ['#22d3ee', '#fbbf24', '#a78bfa', '#4ade80'];
+            const labels = [];
+            for (let group = 1; group <= 4; group++) {
+                if (!info.groups[group]) continue;
+                const focus = info.presence[group];
+                const node = focus && document.getElementById(`warden-node-${focus.room}`);
+                if (!node) { labels.push(`G${group}: WAITING`); continue; }
+                labels.push(`G${group}: ${String(focus.room).toUpperCase()}`);
+                const rect = node.querySelector('rect');
+                const x = Number(rect.getAttribute('x')) + 15 + (group - 1) * 23;
+                const y = Number(rect.getAttribute('y')) + 5;
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x); circle.setAttribute('cy', y);
+                circle.setAttribute('r', 9);
+                circle.setAttribute('fill', colors[group - 1]);
+                const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                text.setAttribute('x', x); text.setAttribute('y', y + 4);
+                text.setAttribute('text-anchor', 'middle');
+                text.setAttribute('font-size', '12');
+                text.setAttribute('font-weight', 'bold');
+                text.setAttribute('fill', '#000');
+                text.textContent = group;
+                layer.append(circle, text);
+            }
+            document.getElementById('player-focus-label').textContent = labels.join(' · ');
+        }
+
+        window.onload = async () => {
+            try { await BEACON_ONLINE.start(); }
+            catch (error) { BEACON_ONLINE.showStartupError(error); return; }
             init();
+            setupOnlineGroups();
+            if (GAME_STORAGE.online) {
+                let lastOnlineControls = '';
+                window.addEventListener('beacon-sync', () => {
+                    const raw = JSON.stringify([GAME_STORAGE.getItem(STATION.STATUS_KEY),
+                        GAME_STORAGE.getItem(STATION.HAZARD_KEY),
+                        ...Object.values(ARCHIVE).map(cfg => GAME_STORAGE.getItem(cfg.key)),
+                        GAME_STORAGE.getItem(BROADCAST_KEY)]);
+                    if (raw === lastOnlineControls) return;
+                    lastOnlineControls = raw;
+                    renderStatusControls();
+                    STATION.applyHazards('warden-node');
+                    Object.keys(ARCHIVE).forEach(renderArchiveControls);
+                    renderBroadcastStatus();
+                });
+            }
             renderPlayerFocus();
             setInterval(renderPlayerFocus, 500);
             setupNotes();
