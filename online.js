@@ -160,7 +160,7 @@
                 if (config && key === FOCUS_KEY && config.role === 'player') {
                     const room = String(JSON.parse(value).room);
                     info.presence[config.group] = { room, time: Date.now() };
-                    enqueue('beacon_focus', { ...params(), p_room: room }, false);
+                    enqueue('beacon_focus', { ...params(), p_room: room });
                 } else {
                     localStorage.setItem(localKey(key), value);
                 }

@@ -73,7 +73,7 @@ The player terminal has a **FULLSCREEN** button (or press `F`) for a cleaner vie
 
 Unlocked text logs show an **Open Document** button on the archive page. It opens a popup (close with the button, `Esc` or a click outside) where the text types itself out the first time it is opened (click the text to skip); afterwards, and with "reduce motion", it appears at once.
 
-In local mode the Warden schematic shows a **players-here marker** on the selected sector. In online mode it shows numbered markers for active groups, as described above. Locations are not cleared by a station reset.
+In local mode the Warden schematic shows a **players-here marker** on the selected sector. In online mode it shows numbered markers for active groups, as described above. A Warden station reset returns the local marker or every enabled online group marker to sector 01; enabled group settings stay unchanged.
 
 ## Warden session log, notes and backup
 

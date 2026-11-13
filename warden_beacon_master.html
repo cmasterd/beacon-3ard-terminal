@@ -789,6 +789,9 @@
             resetAllState();
             Object.values(ARCHIVE).forEach(cfg => { GAME_STORAGE.removeItem(cfg.key); GAME_STORAGE.removeItem(cfg.notifiedKey); });
             [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY, STATION.LOG_KEY, 'vad_text_revealed_v1'].forEach(k => GAME_STORAGE.removeItem(k));
+            GAME_STORAGE.setItem(STATION.FOCUS_KEY, JSON.stringify({ room: '1', t: Date.now() }));
+            GAME_STORAGE.setItem(STATION.RESET_KEY, crypto.randomUUID());
+            renderPlayerFocus();
             STATION.logEvent('WARDEN', 'Station reset');
             renderSessionLog();
             STATION.applyHazards('warden-node');

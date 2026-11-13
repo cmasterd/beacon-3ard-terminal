@@ -76,8 +76,18 @@ end $$;
 select public.beacon_update(current_setting('test.code'), 1, 'vad_shared_station_state_v14', '{"2":{"explored":true}}', 0);
 select public.beacon_update(current_setting('test.code'), 2, 'vad_shared_station_state_v14', '{"3":{"searched":true}}', 0);
 select public.beacon_update(current_setting('test.code'), 2, 'vad_ship_status_v1', '{"power":100}', 0);
-select public.beacon_focus(current_setting('test.code'), 2, '3');
-select public.beacon_focus(current_setting('test.code'), 1, '4');
+reset role;
+select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
+set local role authenticated;
+select public.beacon_set_group(current_setting('test.code'), 3, true);
+select public.beacon_set_group(current_setting('test.code'), 4, true);
+reset role;
+select set_config('request.jwt.claim.sub', '', true);
+set local role anon;
+select public.beacon_focus(current_setting('test.code'), 2, '3', 0);
+select public.beacon_focus(current_setting('test.code'), 1, '4', 0);
+select public.beacon_focus(current_setting('test.code'), 3, '5', 0);
+select public.beacon_focus(current_setting('test.code'), 4, '6', 0);
 select public.beacon_log(current_setting('test.code'), 2, 'PLAYER', 'Explored sector 3', 0, '22222222-2222-4222-8222-222222222222');
 select public.beacon_log(current_setting('test.code'), 2, 'PLAYER', 'Explored sector 3', 0, '22222222-2222-4222-8222-222222222222');
 select public.beacon_log(current_setting('test.code'), 1, 'PLAYER', 'Searched sector 2', 0, '33333333-3333-4333-8333-333333333333');
@@ -118,9 +128,20 @@ begin
         or data -> 'shared' ? 'vad_audio_archive_v1'
         or data #>> '{private,vad_warden_notes_v1}' <> 'PRIVATE NOTE'
         or data #>> '{private,vad_session_log_v1,0,m}' <> 'Station reset'
+        or data #>> '{presence,1,room}' <> '1'
+        or data #>> '{presence,2,room}' <> '1'
+        or data #>> '{presence,3,room}' <> '1'
+        or data #>> '{presence,4,room}' <> '1'
+        or data #>> '{groups,2}' <> 'true'
+        or data #>> '{groups,3}' <> 'true'
+        or data #>> '{groups,4}' <> 'true'
         or data ->> 'reset_epoch' <> '1' then
         raise exception 'reset did not preserve the intended state: %', data;
     end if;
+    begin
+        perform public.beacon_focus(current_setting('test.code'), 2, '3', 0);
+        raise exception 'stale movement survived reset';
+    exception when insufficient_privilege then null; end;
     begin
         perform public.beacon_restore(current_setting('test.code'), '{"vad_shared_station_state_v14":{}}');
         raise exception 'invalid backup accepted';
@@ -146,7 +167,7 @@ do $$
 declare data jsonb;
 begin
     data := public.beacon_read_session(current_setting('test.code'), 2);
-    if data #>> '{groups,2}' <> 'false' or data #>> '{presence,2,room}' <> '3' then
+    if data #>> '{groups,2}' <> 'false' or data #>> '{presence,2,room}' <> '1' then
         raise exception 'disabled group did not retain its last location';
     end if;
 end $$;
@@ -155,7 +176,7 @@ do $$
 declare data jsonb;
 begin
     data := public.beacon_read_session(current_setting('test.code'), 1);
-    if data #>> '{groups,2}' <> 'true' or data #>> '{presence,2,room}' <> '4'
+    if data #>> '{groups,2}' <> 'true' or data #>> '{presence,2,room}' <> '1'
         or data -> 'private' <> '{}'::jsonb then
         raise exception 're-enabled group did not start at Group 1 or exposed Warden data';
     end if;
@@ -167,7 +188,7 @@ set local role anon;
 do $$
 begin
     begin
-        perform public.beacon_focus(current_setting('test.code'), 2, '3');
+        perform public.beacon_focus(current_setting('test.code'), 2, '3', 2);
         raise exception 'disabled group still updates focus';
     exception when insufficient_privilege then null; end;
     begin

@@ -1123,6 +1123,15 @@
             try {
                 await BEACON_ONLINE.start();
                 init();
+                if (!GAME_STORAGE.online) {
+                    window.addEventListener('storage', event => {
+                        if (event.key !== STATION.RESET_KEY || !event.newValue) return;
+                        document.getElementById('permanent-end-screen').className = 'fixed inset-0 bg-black/98 z-50 flex-col items-center justify-center p-6 border-8 backdrop-blur-lg hidden';
+                        loadState();
+                        updateGridVisuals();
+                        selectRoom(1, false);
+                    });
+                }
                 if (GAME_STORAGE.online) {
                     document.getElementById('online-groups').classList.remove('hidden');
                     window.addEventListener('beacon-sync', renderOnlineGroups);

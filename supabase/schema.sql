@@ -123,7 +123,8 @@ begin
 end;
 $$;
 
-create or replace function public.beacon_focus(p_code text, p_group integer, p_room text)
+drop function if exists public.beacon_focus(text, integer, text);
+create or replace function public.beacon_focus(p_code text, p_group integer, p_room text, p_epoch bigint)
 returns void
 language plpgsql security definer set search_path = pg_catalog, beacon_private
 as $$
@@ -135,8 +136,10 @@ begin
     update beacon_private.sessions
     set presence = jsonb_set(presence, array[p_group::text],
         jsonb_build_object('room', p_room, 'time', extract(epoch from clock_timestamp()) * 1000), true)
-    where join_code = p_code and groups ->> p_group::text = 'true';
-    if not found then raise exception 'Session or active group not found' using errcode = '42501'; end if;
+    where join_code = p_code and groups ->> p_group::text = 'true' and reset_epoch = p_epoch;
+    if not found then
+        raise exception 'Session, active group or reset version is invalid; reload before moving' using errcode = '42501';
+    end if;
 end;
 $$;
 
@@ -358,6 +361,10 @@ as $$
 begin
     update beacon_private.sessions
     set shared = jsonb_build_object('vad_shared_station_state_v14', beacon_private.initial_rooms()),
+        presence = presence || (select jsonb_object_agg(group_id, jsonb_build_object(
+            'room', '1', 'time', extract(epoch from clock_timestamp()) * 1000))
+            from unnest(array['1','2','3','4']) as group_id
+            where groups ->> group_id = 'true'),
         private_data = (private_data - 'vad_session_log_v1') || jsonb_build_object('vad_session_log_v1',
             jsonb_build_array(jsonb_build_object('t', extract(epoch from clock_timestamp()) * 1000,
                 's', 'WARDEN', 'm', 'Station reset'))),
@@ -372,7 +379,7 @@ revoke all on function public.beacon_open_warden() from public, anon;
 revoke all on function public.beacon_join_player(text) from public;
 revoke all on function public.beacon_read_session(text, integer) from public;
 revoke all on function public.beacon_set_group(text, integer, boolean) from public, anon;
-revoke all on function public.beacon_focus(text, integer, text) from public;
+revoke all on function public.beacon_focus(text, integer, text, bigint) from public;
 revoke all on function public.beacon_update(text, integer, text, jsonb, bigint) from public;
 revoke all on function public.beacon_log(text, integer, text, text, bigint, uuid) from public;
 revoke all on function public.beacon_clear_log(text, bigint) from public, anon;
@@ -382,7 +389,7 @@ grant execute on function public.beacon_open_warden() to authenticated;
 grant execute on function public.beacon_join_player(text) to anon, authenticated;
 grant execute on function public.beacon_read_session(text, integer) to anon, authenticated;
 grant execute on function public.beacon_set_group(text, integer, boolean) to authenticated;
-grant execute on function public.beacon_focus(text, integer, text) to anon, authenticated;
+grant execute on function public.beacon_focus(text, integer, text, bigint) to anon, authenticated;
 grant execute on function public.beacon_update(text, integer, text, jsonb, bigint) to anon, authenticated;
 grant execute on function public.beacon_log(text, integer, text, text, bigint, uuid) to anon, authenticated;
 grant execute on function public.beacon_clear_log(text, bigint) to authenticated;
