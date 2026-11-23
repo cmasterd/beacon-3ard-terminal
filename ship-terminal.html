@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SHIP TERMINAL // BEACON 3A-R3D</title>
+    <link rel="stylesheet" href="gateway.css">
+    <style>
+        .panel { border: 1px solid #155e75; background: #030712; padding: 1rem; margin-bottom: 1rem; }
+        button, select, input { background: #083344; border: 1px solid #22d3ee; color: #cffafe; padding: .6rem; font: inherit; }
+        button { cursor: pointer; }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        ul { padding-left: 1.25rem; }
+        .row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+        label { display: grid; gap: .35rem; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <nav><a href="beacon.html">← BEACON GATEWAY</a></nav>
+        <p class="eyebrow">BEACON 3A-R3D // CREW INTERFACE</p>
+        <h1>SHIP TERMINAL</h1>
+        <p>SHARED ONLINE SHIP VIEW AND REQUISITIONS</p>
+    </header>
+    <main>
+        <section class="panel" id="connection-message">Connecting to the player session...</section>
+        <div id="ship-content" hidden>
+            <section class="panel">
+                <h2>SHIP STATUS</h2>
+                <div id="ship-details"></div>
+            </section>
+            <section class="panel">
+                <h2>REQUISITION REQUEST</h2>
+                <p>Request ship upgrades, repairs or fuel. The Warden decides and handles approved purchases manually. No credits or ship data are changed automatically.</p>
+                <form id="request-form" class="row">
+                    <label>GROUP <select id="request-group"></select></label>
+                    <label>SHIP ITEM <select id="request-item"></select></label>
+                    <label>QUANTITY <input id="request-quantity" type="number" min="1" max="20" value="1" required></label>
+                    <button id="request-submit" type="submit">SEND REQUEST</button>
+                    <button id="request-discard" type="button" hidden>DISCARD RETRY</button>
+                </form>
+                <p id="request-message" role="status" aria-live="polite"></p>
+            </section>
+            <section class="panel"><h2>REQUEST HISTORY</h2><div id="request-history"></div></section>
+        </div>
+    </main>
+    <footer>VAD PERSONNEL NETWORK // SHIP TERMINAL</footer>
+    <script src="builder-validation.js"></script>
+    <script src="ship-catalog.js"></script>
+    <script src="online.js"></script>
+    <script src="ship-terminal.js"></script>
+</body>
+</html>

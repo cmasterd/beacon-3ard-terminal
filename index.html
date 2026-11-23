@@ -1,200 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#030712">
-    <title>BEACON 3A-R3D // TERMINAL ACCESS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Share Tech Mono', monospace;
-            background-color: #030712;
-            color: #22d3ee;
-            background-image:
-                radial-gradient(rgba(14, 116, 144, 0.15) 1px, transparent 0),
-                linear-gradient(to right, rgba(6, 182, 212, 0.05) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(6, 182, 212, 0.05) 1px, transparent 1px);
-            background-size: 24px 24px, 12px 12px, 12px 12px;
-        }
-        .font-orbitron { font-family: 'Orbitron', sans-serif; }
-        .crt-overlay {
-            position: fixed;
-            inset: 0;
-            background:
-                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-                linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-            background-size: 100% 3px, 6px 100%;
-            pointer-events: none;
-            z-index: 20;
-        }
-        .scanline {
-            width: 100%;
-            height: 4px;
-            background: rgba(34, 211, 238, 0.2);
-            opacity: 0.75;
-            position: absolute;
-            animation: scanline 8s linear infinite;
-            pointer-events: none;
-        }
-        @keyframes scanline {
-            0% { top: 0%; }
-            100% { top: 100%; }
-        }
-        .glow-text { text-shadow: 0 0 8px rgba(34, 211, 238, 0.6); }
-        .terminal-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .terminal-card:hover, .terminal-card:focus-visible { transform: translateY(-4px); }
-        @media (prefers-reduced-motion: reduce) {
-            *, *::before, *::after {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                scroll-behavior: auto !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-    </style>
+    <title>VAD NETWORK // MAIN GATEWAY</title>
+    <link rel="stylesheet" href="gateway.css">
 </head>
-<body class="min-h-screen flex flex-col relative p-4 md:p-8">
-    <script>sessionStorage.removeItem('beacon_online_tab_v1');</script>
-    <div class="crt-overlay"></div>
-    <div class="scanline"></div>
-
-    <header class="relative z-10 border-b-2 border-cyan-500/40 bg-gray-950/80 p-4 md:p-6 rounded backdrop-blur">
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-5">
-            <div>
-                <div class="flex items-center gap-3">
-                    <span class="inline-block w-3 h-3 bg-cyan-400 animate-pulse rounded-full" aria-hidden="true"></span>
-                    <p class="text-xs md:text-sm text-cyan-600 tracking-[0.3em]">VAD NETWORK // SECURE GATEWAY</p>
-                </div>
-                <h1 class="font-orbitron font-black text-3xl md:text-5xl tracking-widest text-cyan-400 glow-text mt-3">
-                    BEACON <span class="text-white">3A-R3D</span>
-                </h1>
-                <p class="text-sm md:text-base text-cyan-700 mt-2">SELECT YOUR TERMINAL TO CONTINUE</p>
-            </div>
-            <div class="border-l-2 border-cyan-500/30 pl-4 text-xs md:text-sm">
-                <span class="block text-cyan-700">STATION STATUS</span>
-                <span class="text-emerald-400 font-bold">● SYSTEMS ONLINE</span>
-            </div>
-        </div>
+<body>
+    <header class="header">
+        <p class="eyebrow">VAD NETWORK // SECURE GATEWAY</p>
+        <h1>TERMINAL NETWORK</h1>
+        <p>PLAY, CREATE AND EXPLORE</p>
     </header>
-
-    <main class="relative z-10 flex-grow flex flex-col justify-center py-10 md:py-16">
-        <div class="max-w-6xl w-full mx-auto">
-            <div class="text-center mb-8 md:mb-12">
-                <p class="text-xs text-cyan-700 tracking-[0.35em]">AUTHORIZED ACCESS ONLY</p>
-                <h2 class="font-orbitron font-bold text-xl md:text-2xl text-cyan-100 tracking-wider mt-3">CHOOSE AN INTERFACE</h2>
-                <p class="text-sm text-gray-400 mt-3">Choose local play in one browser, or sign in for an online session across devices.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-8">
-                <section class="terminal-card block bg-gray-950/90 border border-cyan-500/50 rounded-lg p-6 md:p-8 shadow-lg hover:shadow-cyan-950/60">
-                    <div class="flex justify-between items-start gap-4">
-                        <div>
-                            <p class="text-xs text-cyan-700 tracking-[0.25em]">01 // FIELD OPERATIVE</p>
-                            <h3 class="font-orbitron font-bold text-xl md:text-2xl text-cyan-300 group-hover:text-cyan-100 mt-3">PLAYER BRIEFING</h3>
-                        </div>
-                        <span class="font-orbitron text-3xl text-cyan-700 group-hover:text-cyan-300" aria-hidden="true">↗</span>
-                    </div>
-                    <p class="text-sm text-gray-400 leading-relaxed mt-5">Explore the station schematic, investigate sectors, recover mission intel, and decide the station's fate.</p>
-                    <form id="player-join-form" class="mt-7 pt-4 border-t border-cyan-900/70 space-y-3">
-                        <label for="player-code" class="block text-xs text-cyan-500">WARDEN SESSION CODE</label>
-                        <input id="player-code" type="text" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="5-character code" class="w-full p-2 text-sm uppercase text-cyan-100 bg-black border border-cyan-800 rounded">
-                        <p id="player-join-status" role="status" class="text-xs text-cyan-600"></p>
-                        <button type="submit" class="w-full px-3 py-2 bg-cyan-950 border border-cyan-500 text-cyan-200 rounded font-bold hover:bg-cyan-900">OPEN ONLINE TERMINAL →</button>
-                        <button id="player-forget" type="button" class="hidden text-xs text-cyan-400 underline">FORGET SAVED SESSION</button>
-                        <a href="player_beacon_blueprint.html" class="block text-xs text-cyan-500 underline">OPEN LOCAL PLAYER TERMINAL</a>
-                    </form>
-                </section>
-
-                <section class="terminal-card block bg-black/90 border border-rose-600/50 rounded-lg p-6 md:p-8 shadow-lg hover:shadow-rose-950/60">
-                    <div class="flex justify-between items-start gap-4">
-                        <div>
-                            <p class="text-xs text-rose-700 tracking-[0.25em]">02 // STATION CONTROL</p>
-                            <h3 class="font-orbitron font-bold text-xl md:text-2xl text-rose-400 group-hover:text-rose-200 mt-3">WARDEN OVERWATCH</h3>
-                        </div>
-                        <span class="font-orbitron text-3xl text-rose-800 group-hover:text-rose-300" aria-hidden="true">↗</span>
-                    </div>
-                    <p class="text-sm text-gray-400 leading-relaxed mt-5">Monitor discovered sectors, inspect station telemetry, and manage available Warden overrides.</p>
-                    <div class="mt-7 pt-4 border-t border-rose-950 space-y-3">
-                        <a href="online.html" class="block text-center px-3 py-2 bg-rose-950 border border-rose-500 text-rose-200 rounded font-bold hover:bg-rose-900">ONLINE WARDEN LOGIN →</a>
-                        <a href="warden_beacon_master.html" class="block text-xs text-rose-400 underline">OPEN LOCAL WARDEN TERMINAL</a>
-                    </div>
-                </section>
-
-                <a href="archive.html" class="terminal-card group block bg-gray-950/90 border border-amber-500/50 hover:border-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-amber-300 rounded-lg p-6 md:p-8 shadow-lg hover:shadow-amber-950/60 md:col-span-2 lg:col-span-1">
-                    <div class="flex justify-between items-start gap-4">
-                        <div>
-                            <p class="text-xs text-amber-700 tracking-[0.25em]">03 // RECOVERED RECORDINGS</p>
-                            <h3 class="font-orbitron font-bold text-xl md:text-2xl text-amber-400 group-hover:text-amber-200 mt-3">AUDIO & VIDEO ARCHIVE</h3>
-                        </div>
-                        <span class="font-orbitron text-3xl text-amber-700 group-hover:text-amber-300" aria-hidden="true">↗</span>
-                    </div>
-                    <p class="text-sm text-gray-400 leading-relaxed mt-5">Listen to recovered voice logs and watch video logs as the Warden releases them to the crew.</p>
-                    <div class="mt-7 pt-4 border-t border-amber-950 flex items-center justify-between text-xs">
-                        <span class="text-amber-700">WARDEN-RELEASED</span>
-                        <span class="text-amber-300 tracking-widest">OPEN ARCHIVE →</span>
-                    </div>
-                </a>
-            </div>
-
-            <p class="text-center text-xs text-gray-600 mt-8">Online play requires a Warden session code. Local play shares progress in the same browser.</p>
+    <main>
+        <div class="intro">
+            <p class="eyebrow">AUTHORIZED ACCESS ONLY</p>
+            <h2>CHOOSE YOUR DESTINATION</h2>
+        </div>
+        <div class="cards">
+            <a class="card cyan" href="library.html">
+                <span class="eyebrow">01 // PLAY</span>
+                <h3>GAME LIBRARY</h3>
+                <p>Choose an adventure and access its player and Warden terminals.</p>
+                <span class="action">OPEN LIBRARY →</span>
+            </a>
+            <a class="card amber" href="builders.html">
+                <span class="eyebrow">02 // CREATE</span>
+                <h3>BUILDERS</h3>
+                <p>Design and test scenarios and ships using local creator tools.</p>
+                <span class="action">OPEN BUILDERS →</span>
+            </a>
+            <a class="card green" href="terminals.html">
+                <span class="eyebrow">03 // SHARED TOOLS</span>
+                <h3>SHARED TERMINALS</h3>
+                <p>Access tools that can be used alongside your games.</p>
+                <span class="action">OPEN TERMINALS →</span>
+            </a>
         </div>
     </main>
-
-    <script src="online.js"></script>
-    <script>
-        const PLAYER_SESSION_KEY = 'beacon_player_session_v1';
-        const codeInput = document.getElementById('player-code');
-        const joinStatus = document.getElementById('player-join-status');
-        const forgetButton = document.getElementById('player-forget');
-
-        function updatePlayerSessionStatus() {
-            const saved = localStorage.getItem(PLAYER_SESSION_KEY);
-            const hasSaved = /^[a-f0-9]{64}$/.test(saved || '');
-            joinStatus.textContent = hasSaved
-                ? 'SAVED SESSION AVAILABLE ON THIS DEVICE. ENTER A NEW CODE TO SWITCH.'
-                : 'ENTER THE CODE FROM YOUR WARDEN.';
-            forgetButton.classList.toggle('hidden', !hasSaved);
-        }
-
-        document.getElementById('player-join-form').addEventListener('submit', async event => {
-            event.preventDefault();
-            const entered = codeInput.value.trim().toUpperCase();
-            const saved = localStorage.getItem(PLAYER_SESSION_KEY);
-            if (entered && !/^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$/.test(entered)) {
-                joinStatus.textContent = 'INVALID CODE. ENTER THE FIVE CHARACTERS FROM YOUR WARDEN.';
-                codeInput.focus();
-                return;
-            }
-            if (!entered && !/^[a-f0-9]{64}$/.test(saved || '')) {
-                joinStatus.textContent = 'ENTER THE FIVE-CHARACTER CODE FROM YOUR WARDEN.';
-                codeInput.focus();
-                return;
-            }
-            const button = event.currentTarget.querySelector('button[type="submit"]');
-            button.disabled = true;
-            joinStatus.textContent = 'CONNECTING...';
-            try {
-                const result = entered ? await BEACON_ONLINE.rpc('beacon_join_player', { p_player_code: entered }) : { code: saved };
-                if (!result || !/^[a-f0-9]{64}$/.test(result.code || '')) throw new Error('Invalid response from session service');
-                const url = new URL('player_beacon_blueprint.html', location.href);
-                url.hash = new URLSearchParams({ beacon_session: result.code, role: 'player' }).toString();
-                location.href = url.href;
-            } catch (error) {
-                joinStatus.textContent = 'COULD NOT JOIN: ' + error.message;
-                button.disabled = false;
-            }
-        });
-        forgetButton.addEventListener('click', () => {
-            localStorage.removeItem(PLAYER_SESSION_KEY);
-            codeInput.value = '';
-            updatePlayerSessionStatus();
-        });
-        updatePlayerSessionStatus();
-    </script>
-    <footer class="relative z-10 border-t border-cyan-900/60 pt-4 text-center text-xs text-cyan-900 tracking-widest">
-        VAD PERSONNEL NETWORK // BEACON 3A-R3D // CONNECTION ESTABLISHED
-    </footer>
+    <footer>VAD PERSONNEL NETWORK // CONNECTION ESTABLISHED</footer>
 </body>
 </html>

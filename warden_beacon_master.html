@@ -329,6 +329,9 @@
     </section>
 
     <script src="online.js"></script>
+    <script src="builder-validation.js"></script>
+    <script src="ship-catalog.js"></script>
+    <script src="warden-ship.js"></script>
     <script src="logs.js"></script>
     <script src="station.js"></script>
     <script>
@@ -1355,6 +1358,7 @@
             catch (error) { BEACON_ONLINE.showStartupError(error); return; }
             init();
             setupOnlineGroups();
+            setupWardenShip();
             if (GAME_STORAGE.online) {
                 let lastOnlineControls = '';
                 window.addEventListener('beacon-sync', () => {

@@ -13,9 +13,24 @@ create table if not exists beacon_private.sessions (
 );
 alter table beacon_private.sessions add column if not exists reset_epoch bigint not null default 0;
 alter table beacon_private.sessions add column if not exists player_code text;
+alter table beacon_private.sessions add column if not exists ship_data jsonb;
 create unique index if not exists beacon_sessions_player_code_idx on beacon_private.sessions (player_code);
 alter table beacon_private.sessions enable row level security;
 revoke all on all tables in schema beacon_private from public, anon, authenticated;
+
+create table if not exists beacon_private.ship_requests (
+    owner_id uuid not null references beacon_private.sessions(owner_id) on delete cascade,
+    request_id uuid not null,
+    group_number integer not null check (group_number between 1 and 4),
+    item_id text not null,
+    quantity integer not null check (quantity between 1 and 20),
+    status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+    created_at timestamptz not null default clock_timestamp(),
+    decided_at timestamptz,
+    primary key (owner_id, request_id)
+);
+alter table beacon_private.ship_requests enable row level security;
+revoke all on beacon_private.ship_requests from public, anon, authenticated;
 
 create or replace function beacon_private.initial_rooms()
 returns jsonb language sql immutable set search_path = pg_catalog as $$
@@ -97,9 +112,98 @@ begin
     end if;
     return jsonb_build_object('shared', session_row.shared, 'groups', session_row.groups,
         'presence', session_row.presence,
+        'ship', session_row.ship_data,
+        'ship_requests', coalesce((select jsonb_agg(jsonb_build_object(
+            'id', request_id, 'group', group_number, 'item', item_id, 'quantity', quantity,
+            'status', status, 'created_at', created_at, 'decided_at', decided_at)
+            order by created_at desc, request_id)
+            from beacon_private.ship_requests where owner_id = session_row.owner_id), '[]'::jsonb),
         'private', case when is_owner then session_row.private_data else '{}'::jsonb end,
         'reset_epoch', session_row.reset_epoch,
         'server_time', extract(epoch from clock_timestamp()) * 1000);
+end;
+$$;
+
+create or replace function public.beacon_publish_ship(p_code text, p_ship jsonb, p_epoch bigint)
+returns void language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+begin
+    if p_ship is null or jsonb_typeof(p_ship) <> 'object' or octet_length(p_ship::text) > 262144
+        or jsonb_typeof(p_ship -> 'name') is distinct from 'string'
+        or jsonb_typeof(p_ship -> 'rooms') is distinct from 'array' then
+        raise exception 'Invalid ship data' using errcode = '22023';
+    end if;
+    update beacon_private.sessions set ship_data = p_ship
+    where join_code = p_code and owner_id = auth.uid() and reset_epoch = p_epoch;
+    if not found then raise exception 'Warden access required or session changed; reload' using errcode = '42501'; end if;
+end;
+$$;
+
+create or replace function public.beacon_request_ship_item(
+    p_code text, p_group integer, p_item text, p_quantity integer, p_request_id uuid, p_epoch bigint)
+returns void language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+declare session_row beacon_private.sessions%rowtype;
+begin
+    select * into session_row from beacon_private.sessions where join_code = p_code for update;
+    if not found or p_group is null or p_group not between 1 and 4
+        or session_row.groups ->> p_group::text is distinct from 'true' then
+        raise exception 'Active player group required' using errcode = '42501';
+    end if;
+    if p_epoch is distinct from session_row.reset_epoch then
+        raise exception 'Session changed; reload before submitting' using errcode = '40001';
+    end if;
+    if session_row.ship_data is null then raise exception 'Warden has not published a ship' using errcode = '22023'; end if;
+    if p_request_id is null or p_quantity is null or p_quantity not between 1 and 20
+        or p_item is null or p_item not in ('up_railgun','up_autocannon','up_armor','up_jump',
+            'up_fueltank','up_medpod','dry_refuel_1','dry_refuel_full','dry_hull_10','dry_systems_all') then
+        raise exception 'Invalid ship request' using errcode = '22023';
+    end if;
+    if exists (select 1 from beacon_private.ship_requests where owner_id = session_row.owner_id and request_id = p_request_id) then
+        if not exists (select 1 from beacon_private.ship_requests where owner_id = session_row.owner_id and request_id = p_request_id
+            and group_number = p_group and item_id = p_item and quantity = p_quantity) then
+            raise exception 'Request identifier already used' using errcode = '22023';
+        end if;
+        return;
+    end if;
+    if (select count(*) from beacon_private.ship_requests where owner_id = session_row.owner_id) >= 200 then
+        raise exception 'Request history is full; ask the Warden to clear decided requests' using errcode = '54000';
+    end if;
+    insert into beacon_private.ship_requests(owner_id, request_id, group_number, item_id, quantity)
+    values (session_row.owner_id, p_request_id, p_group, p_item, p_quantity);
+end;
+$$;
+
+create or replace function public.beacon_decide_ship_request(p_code text, p_request_id uuid, p_status text, p_epoch bigint)
+returns void language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+declare session_row beacon_private.sessions%rowtype;
+begin
+    select * into session_row from beacon_private.sessions where join_code = p_code and owner_id = auth.uid() for update;
+    if not found then raise exception 'Warden access required' using errcode = '42501'; end if;
+    if p_epoch is distinct from session_row.reset_epoch then
+        raise exception 'Session changed; reload before deciding' using errcode = '40001';
+    end if;
+    if p_status is null or p_status not in ('approved','rejected') then
+        raise exception 'Invalid decision' using errcode = '22023';
+    end if;
+    update beacon_private.ship_requests set status = p_status, decided_at = clock_timestamp()
+    where owner_id = session_row.owner_id and request_id = p_request_id and status = 'pending';
+    if not found then raise exception 'Request not found or already decided' using errcode = '22023'; end if;
+end;
+$$;
+
+create or replace function public.beacon_clear_decided_ship_requests(p_code text, p_epoch bigint)
+returns void language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+declare session_row beacon_private.sessions%rowtype;
+begin
+    select * into session_row from beacon_private.sessions where join_code = p_code and owner_id = auth.uid() for update;
+    if not found then raise exception 'Warden access required' using errcode = '42501'; end if;
+    if p_epoch is distinct from session_row.reset_epoch then
+        raise exception 'Session changed; reload before clearing' using errcode = '40001';
+    end if;
+    delete from beacon_private.ship_requests where owner_id = session_row.owner_id and status <> 'pending';
 end;
 $$;
 
@@ -385,6 +489,10 @@ revoke all on function public.beacon_log(text, integer, text, text, bigint, uuid
 revoke all on function public.beacon_clear_log(text, bigint) from public, anon;
 revoke all on function public.beacon_restore(text, jsonb) from public, anon;
 revoke all on function public.beacon_reset(text) from public, anon;
+revoke all on function public.beacon_publish_ship(text, jsonb, bigint) from public, anon;
+revoke all on function public.beacon_request_ship_item(text, integer, text, integer, uuid, bigint) from public;
+revoke all on function public.beacon_decide_ship_request(text, uuid, text, bigint) from public, anon;
+revoke all on function public.beacon_clear_decided_ship_requests(text, bigint) from public, anon;
 grant execute on function public.beacon_open_warden() to authenticated;
 grant execute on function public.beacon_join_player(text) to anon, authenticated;
 grant execute on function public.beacon_read_session(text, integer) to anon, authenticated;
@@ -395,3 +503,7 @@ grant execute on function public.beacon_log(text, integer, text, text, bigint, u
 grant execute on function public.beacon_clear_log(text, bigint) to authenticated;
 grant execute on function public.beacon_restore(text, jsonb) to authenticated;
 grant execute on function public.beacon_reset(text) to authenticated;
+grant execute on function public.beacon_publish_ship(text, jsonb, bigint) to authenticated;
+grant execute on function public.beacon_request_ship_item(text, integer, text, integer, uuid, bigint) to anon, authenticated;
+grant execute on function public.beacon_decide_ship_request(text, uuid, text, bigint) to authenticated;
+grant execute on function public.beacon_clear_decided_ship_requests(text, bigint) to authenticated;

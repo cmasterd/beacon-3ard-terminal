@@ -160,6 +160,7 @@
             <button id="sound-toggle" type="button" onclick="toggleSound()" class="self-center text-xs px-3 py-2 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold tracking-wider cursor-pointer">🔇 SOUND OFF</button>
             <button id="fullscreen-toggle" type="button" onclick="toggleFullscreen()" class="self-center text-xs px-3 py-2 bg-gray-950 border border-cyan-700 text-cyan-400 hover:bg-cyan-950 rounded transition font-bold tracking-wider cursor-pointer">⛶ FULLSCREEN (F)</button>
             <a href="archive.html" target="_blank" rel="noopener" class="self-center text-xs px-3 py-2 bg-amber-950/60 border border-amber-600 text-amber-300 hover:bg-amber-900 rounded transition font-bold tracking-wider">🎧 ARCHIVE <span id="audio-header-count" class="text-amber-500">(0/11)</span></a>
+            <a id="ship-terminal-link" href="ship-terminal.html" class="hidden self-center text-xs px-3 py-2 bg-emerald-950 border border-emerald-600 text-emerald-300 rounded font-bold">SHIP TERMINAL</a>
         </div>
     </header>
 
@@ -1133,6 +1134,12 @@
                     });
                 }
                 if (GAME_STORAGE.online) {
+                    const shipLink = document.getElementById('ship-terminal-link');
+                    shipLink.classList.remove('hidden');
+                    shipLink.addEventListener('click', event => {
+                        event.preventDefault();
+                        location.href = GAME_STORAGE.link('ship-terminal.html', 'player', GAME_STORAGE.group);
+                    });
                     document.getElementById('online-groups').classList.remove('hidden');
                     window.addEventListener('beacon-sync', renderOnlineGroups);
                     window.addEventListener('beacon-group-disabled', () => {

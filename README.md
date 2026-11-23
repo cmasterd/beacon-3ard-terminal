@@ -1,11 +1,32 @@
-# Beacon 3A-R3D Terminals
+# VAD Terminal Network
 
-A pair of browser-based interfaces for running a Beacon 3A-R3D salvage scenario:
+The main gateway offers a game library, local creator prototypes and shared terminals. The library's first game is Beacon 3A-R3D:
 
-- **Terminal gateway** (`index.html`): choose the Player or Warden interface.
+- **Main gateway** (`index.html`): access the game library, builders and shared terminals.
+- **Game library** (`library.html`) and **Beacon gateway** (`beacon.html`): choose Beacon and its Player, Warden, Archive or Shop interface.
 - **Player briefing** (`player_beacon_blueprint.html`): explore station sectors, search for items and logs, unlock keypads, and make the final escape or destruction choice.
 - **Warden terminal** (`warden_beacon_master.html`): monitor player progress, control selected station overrides, send emergency broadcasts and run a countdown timer on the player terminal, and unlock audio, video and text logs.
 - **Audio, video & text archive** (`archive.html`): lists audio, video and text logs; each is locked until the Warden unlocks it, and the player terminal alerts when one is released. "Leaving Gateway" (audio log #06) is public: it is always unlocked, has no Warden control, and triggers no alert. The other logs are Warden-locked placeholders expecting `audio/log-01.mp3` to `audio/log-05.mp3` and `video/log-01.mp4` to `video/log-03.mp4`. Text logs (emails, manifests, reports) need no files: write each entry's `body` directly in `logs.js`.
+
+## Builders and shared shop
+
+The **Builders** page offers two local prototypes. Scenario Builder edits and previews a scenario in one page, with mechanics currently specific to Beacon 3A-R3D. Shipyard Builder edits a ship and provides a ship terminal and shop. Neither is connected to Beacon's online session. They save one project each in this browser on this origin. Export JSON regularly to back up or transfer your project; imported files replace the current project. Exports include current simulation progress, not just the starting design. Projects are not automatically published to the Game Library.
+
+The Shop Terminal is available under **Shared Terminals** and from the Beacon gateway. It opens Shipyard directly in shop mode and uses the same locally saved ship and credits as Shipyard. Its purchases are not shared across devices and do not update Beacon's online session. If the same project changes in another tab, saving pauses to avoid overwriting it: export any unsaved work and reload to see the latest copy.
+
+Invalid imports are rejected without replacing the project. Storage errors and invalid saved data are shown on the page; a damaged saved project is not overwritten automatically. A valid imported backup can replace it.
+
+### Game-aware foundation (in development)
+
+`supabase/game_foundation.sql` is an experimental, additive database migration intended to be run **after** `supabase/schema.sql`. It registers Beacon as a game and links existing and newly created Beacon sessions to game-session records without copying or changing their codes, credentials, progress, notes, ships or requests. It also provides private storage for versioned game definitions, separate session state and group inventories, and a model that can associate multiple named sessions with a game. Public catalog results include only published game metadata, not definitions; a Warden's session list contains only that account's session metadata.
+
+This is a foundation, not a finished game-publishing feature: the Scenario Builder cannot publish games, create new playable sessions, or keep secrets private during online play yet. Beacon still uses its existing terminals and one legacy session per Warden. No new scenario runtime or rule engine is exposed by this migration. Test it in an isolated database and back up the live project before applying it; do not apply it to production until the remaining features are ready.
+
+### Shared online ship and requisitions
+
+The Warden can publish a Shipyard ship from the current browser or upload an exported Shipyard JSON file in the online Warden terminal's **Shared Ship & Requisitions** panel. This replaces the published snapshot. All players in the session can view every field of that snapshot, including ship logs and cargo, so do not publish Warden-only information. The online ship terminal is accessible from the Beacon player code form or the online player terminal. Players select an enabled group and request ship upgrades, fuel or repairs; the Warden sees the requesting group and can approve or reject each request. Request history is visible to players.
+
+Approval is **manual**: it does not deduct credits, perform a purchase or change the shared ship. The Warden handles the purchase in Shipyard or another way, then republishes the updated ship. The Shipyard shop remains local and is not the shared ship itself. Requests and their decisions persist across devices, station resets and backup restores, as does the published ship. They are not included in the existing Beacon backup export; separately export the ship from Shipyard. The Warden can clear decided requests to make room; pending requests are retained. The session holds up to 200 requests. An uncertain submission can be retried with the same identifier while its tab remains open; check the history before creating a replacement.
 
 ## Editing logs
 
@@ -32,7 +53,7 @@ The five-character session code and player link grant access: share them only wi
 1. Create a Supabase project and manually create an email/password Warden user in **Authentication → Users**. Confirm that user. Consider disabling public user sign-ups in Authentication settings while keeping email/password sign-in enabled.
 2. In the Supabase **SQL Editor**, run the complete contents of [`supabase/schema.sql`](supabase/schema.sql). It creates private tables with row-level security and functions that authorize player and Warden access. Re-running it preserves existing sessions.
 3. `online.js` is configured with this project's URL and publishable key. These are public client configuration, not administrative credentials. Never put a database password, secret key or service-role key in the site or backup.
-4. Open the gateway, choose **Online Warden Login**, sign in, and share the player link or session code. Enable additional groups as needed. The online station starts separately from local progress; use Backup & Restore to import an existing local backup if desired.
+4. Open the gateway, select **Game Library → Beacon 3A-R3D → Online Warden Login**, sign in, and share the player link or session code. Enable additional groups as needed. The online station starts separately from local progress; use Backup & Restore to import an existing local backup if desired.
 
 An internet connection is required. Supabase can pause an inactive free project; restore it from its dashboard before play if needed. The Warden's **Exit Online Session** signs out on that browser. Each Warden account has one persistent online station.
 
@@ -47,11 +68,17 @@ py -m http.server 8000
 Then open the gateway in your browser and choose a terminal:
 
 - Gateway: <http://localhost:8000/>
+- Game library: <http://localhost:8000/library.html>
+- Beacon gateway: <http://localhost:8000/beacon.html>
+- Builders: <http://localhost:8000/builders.html>
+- Shared terminals: <http://localhost:8000/terminals.html>
 - Player: <http://localhost:8000/player_beacon_blueprint.html>
 - Warden: <http://localhost:8000/warden_beacon_master.html>
 - Audio, video & text archive: <http://localhost:8000/archive.html>
 
 The pages use Tailwind CSS and fonts from CDNs, so an internet connection is needed for those visual assets. The game itself is implemented in the HTML files and does not require a build step.
+
+Run the focused builder validation and storage tests with `node tests\builder_validation_test.js`.
 
 ## Progress and reset
 

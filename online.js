@@ -219,6 +219,34 @@
             await rpc('beacon_set_group', { p_code: config.code, p_group: group, p_enabled: enabled });
             await refresh();
         },
+        async publishShip(ship) {
+            if (!config || config.role !== 'warden') throw new Error('Warden access required');
+            await this.syncNow();
+            await rpc('beacon_publish_ship', { p_code: config.code, p_ship: ship, p_epoch: info.reset_epoch });
+            await this.syncNow();
+        },
+        async requestShipItem(item, quantity, id, group, epoch) {
+            if (!config || config.role !== 'player') throw new Error('Online player access required');
+            await this.syncNow();
+            if (config.group !== group) throw new Error('The request group changed or was disabled');
+            if (info.reset_epoch !== epoch) throw new Error('The session was reset or restored');
+            await rpc('beacon_request_ship_item', { ...params(), p_item: item, p_quantity: quantity,
+                p_request_id: id, p_epoch: epoch });
+            await this.syncNow();
+        },
+        async decideShipRequest(id, status) {
+            if (!config || config.role !== 'warden') throw new Error('Warden access required');
+            await this.syncNow();
+            await rpc('beacon_decide_ship_request', { p_code: config.code, p_request_id: id,
+                p_status: status, p_epoch: info.reset_epoch });
+            await this.syncNow();
+        },
+        async clearDecidedShipRequests() {
+            if (!config || config.role !== 'warden') throw new Error('Warden access required');
+            await this.syncNow();
+            await rpc('beacon_clear_decided_ship_requests', { p_code: config.code, p_epoch: info.reset_epoch });
+            await this.syncNow();
+        },
         selectGroup(group) {
             if (!config || config.role !== 'player' || !info || !info.groups[group]) {
                 throw new Error('That group is not enabled by the Warden');

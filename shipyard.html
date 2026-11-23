@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHIPYARD//OS — Mothership 1E Ship Builder, Ship Terminal & Shop OS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --bg-void: #07090c;
+      --bg-panel: #0c1016;
+      --bg-elevated: #121822;
+      --amber: #ffb000;
+      --amber-dim: rgba(255, 176, 0, 0.22);
+      --phosphor: #22c55e;
+      --phosphor-dim: rgba(34, 197, 94, 0.22);
+      --crimson: #ff3b3b;
+      --crimson-dim: rgba(255, 59, 59, 0.25);
+      --cyan: #00e5ff;
+      --border-subtle: #1f2937;
+      --crt-scale: 1;
+    }
+
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: #2b3648 #07090c;
+    }
+
+    html {
+      font-size: calc(15px * var(--crt-scale));
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg-void);
+      color: #d8e1eb;
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Cassette-Futurism CRT Scanline & Vignette Overlay */
+    .crt-overlay {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background:
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.26) 50%),
+        radial-gradient(circle at center, transparent 66%, rgba(0, 0, 0, 0.52) 100%);
+      background-size: 100% 3px, 100% 100%;
+    }
+
+    .font-display {
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 0.06em;
+    }
+
+    .glow-amber { text-shadow: 0 0 8px rgba(255, 176, 0, 0.5); }
+    .glow-green { text-shadow: 0 0 8px rgba(34, 197, 94, 0.5); }
+    .glow-crimson { text-shadow: 0 0 10px rgba(255, 59, 59, 0.65); }
+
+    .panel-box {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+    }
+
+    .btn-crt {
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-elevated);
+      border-radius: 3px;
+      transition: all 0.14s ease;
+      cursor: pointer;
+    }
+    .btn-crt:hover:not(:disabled) {
+      border-color: var(--amber);
+      color: var(--amber);
+      box-shadow: 0 0 10px var(--amber-dim);
+    }
+    .btn-crt:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-amber {
+      border: 1px solid var(--amber);
+      background: rgba(255, 176, 0, 0.12);
+      color: var(--amber);
+      border-radius: 3px;
+    }
+    .btn-amber:hover:not(:disabled) {
+      background: var(--amber);
+      color: #07090c;
+      box-shadow: 0 0 12px var(--amber-dim);
+    }
+
+    .btn-green {
+      border: 1px solid var(--phosphor);
+      background: rgba(34, 197, 94, 0.12);
+      color: var(--phosphor);
+      border-radius: 3px;
+    }
+    .btn-green:hover:not(:disabled) {
+      background: var(--phosphor);
+      color: #07090c;
+      box-shadow: 0 0 12px var(--phosphor-dim);
+    }
+
+    .btn-crimson {
+      border: 1px solid var(--crimson);
+      background: rgba(255, 59, 59, 0.14);
+      color: var(--crimson);
+      border-radius: 3px;
+    }
+    .btn-crimson:hover:not(:disabled) {
+      background: var(--crimson);
+      color: #07090c;
+      box-shadow: 0 0 14px var(--crimson-dim);
+    }
+
+    input, select, textarea {
+      background: #06080b;
+      border: 1px solid #263142;
+      color: #e6edf5;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      padding: 0.38rem 0.55rem;
+      border-radius: 3px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--amber);
+      box-shadow: 0 0 6px var(--amber-dim);
+    }
+
+    .deck-grid-bg {
+      background-image:
+        linear-gradient(to right, rgba(31, 41, 55, 0.4) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(31, 41, 55, 0.4) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    @keyframes redAlertPulse {
+      0%, 100% { background-color: rgba(127, 29, 29, 0.28); border-color: rgba(255, 59, 59, 0.85); }
+      50% { background-color: rgba(127, 29, 29, 0.08); border-color: rgba(255, 59, 59, 0.25); }
+    }
+    .red-alert-active {
+      animation: redAlertPulse 1.5s infinite;
+    }
+
+    /* Viewport Width Sizer Frames */
+    .viewport-compact {
+      max-width: 960px;
+      margin: 0 auto;
+      border-left: 1px solid #1f2937;
+      border-right: 1px solid #1f2937;
+    }
+    .viewport-standard {
+      max-width: 1440px;
+      margin: 0 auto;
+      border-left: 1px solid #1f2937;
+      border-right: 1px solid #1f2937;
+    }
+    .viewport-wide {
+      max-width: 100%;
+      width: 100%;
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen">
+  <div class="crt-overlay"></div>
+
+  <!-- ==================== GLOBAL TOP NAVIGATION & VIEWPORT SIZER ==================== -->
+  <header class="panel-box border-b border-slate-800 px-3 py-2 flex flex-wrap items-center justify-between gap-2 sticky top-0 z-40">
+    <!-- Brand & Vessel Name -->
+    <div class="flex items-center gap-2.5">
+      <span id="globalAlertDot" class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+      <span class="font-display text-lg font-bold text-amber-400 glow-amber">SHIPYARD//OS</span>
+      <span class="text-slate-600 hidden sm:inline">|</span>
+      <span id="headerShipBadge" class="text-xs font-bold text-emerald-400 truncate max-w-[180px] sm:max-w-[260px]">
+        THE ENDLESS WALTZ
+      </span>
+    </div>
+
+    <!-- 3 Primary Modes -->
+    <nav class="flex flex-wrap items-center bg-black/80 p-1 border border-slate-800 rounded gap-1">
+      <button id="tabBuilder" onclick="switchMode('builder')" class="px-2.5 py-1 text-xs font-bold tracking-wider transition rounded">
+        [ SHIP BUILDER ]
+      </button>
+      <button id="tabTerminal" onclick="switchMode('terminal')" class="px-2.5 py-1 text-xs font-bold tracking-wider transition rounded">
+        [ SHIP TERMINAL ]
+      </button>
+      <button id="tabShop" onclick="switchMode('shop')" class="px-2.5 py-1 text-xs font-bold tracking-wider transition rounded">
+        [ SHOP TERMINAL ]
+      </button>
+    </nav>
+
+    <!-- UI Viewport / Terminal Sizer + JSON Tools -->
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <!-- Viewport Width Toggle -->
+      <div class="flex items-center bg-black/70 border border-slate-800 rounded p-0.5" title="Terminal Viewport Width">
+        <span class="text-[10px] text-slate-500 px-1.5 hidden md:inline">FRAME:</span>
+        <button id="sizeCompact" onclick="setViewportSize('compact')" class="px-1.5 py-0.5 text-[10px] font-bold rounded">COMPACT</button>
+        <button id="sizeStandard" onclick="setViewportSize('standard')" class="px-1.5 py-0.5 text-[10px] font-bold rounded">STD</button>
+        <button id="sizeWide" onclick="setViewportSize('wide')" class="px-1.5 py-0.5 text-[10px] font-bold rounded">WIDE</button>
+      </div>
+
+      <!-- CRT Text Scale Toggle -->
+      <div class="flex items-center bg-black/70 border border-slate-800 rounded p-0.5" title="CRT UI Text Scale">
+        <span class="text-[10px] text-slate-500 px-1.5 hidden md:inline">SCALE:</span>
+        <button id="scale90" onclick="setCrtScale(0.9)" class="px-1.5 py-0.5 text-[10px] font-bold rounded">90%</button>
+        <button id="scale100" onclick="setCrtScale(1.0)" class="px-1.5 py-0.5 text-[10px] font-bold rounded">100%</button>
+        <button id="scale115" onclick="setCrtScale(1.15)" class="px-1.5 py-0.5 text-[10px] font-bold rounded">115%</button>
+      </div>
+
+      <!-- Export / Import -->
+      <button onclick="exportShipJSON()" class="btn-crt px-2 py-1 font-bold text-[11px]" title="Export Vessel JSON">
+        EXPORT
+      </button>
+      <label class="btn-crt px-2 py-1 font-bold text-[11px] cursor-pointer" title="Import Vessel JSON">
+        IMPORT
+        <input type="file" accept=".json" class="hidden" onchange="importShipJSON(event)" />
+      </label>
+    </div>
+  </header>
+
+  <div class="px-3 py-2 bg-emerald-950 text-xs text-emerald-200">
+    <a class="underline mr-3" href="index.html">MAIN GATEWAY</a>
+    <a class="underline mr-3" href="builders.html">BUILDERS</a>
+    <a class="underline mr-3" href="terminals.html">SHARED TERMINALS</a>
+    LOCAL PROTOTYPE: ship and purchases are saved in this browser, not in the Beacon online session. Export JSON for backup.
+  </div>
+  <div id="builder-storage-status" role="alert" hidden class="px-3 py-2 bg-red-950 text-red-200 text-sm"></div>
+  <!-- MAIN SIZED CONTAINER -->
+  <div id="appViewportFrame" class="flex-1 flex flex-col viewport-wide transition-all">
+
+    <!-- ==================== MODE 1: SHIP BUILDER ==================== -->
+    <main id="viewBuilder" class="flex-1 p-3 sm:p-4 space-y-4">
+      <!-- Top Template & Quick Preset Bar -->
+      <div class="panel-box p-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div class="font-display text-xs font-bold text-amber-400">MOTHERSHIP 1E // DRYDOCK ARCHITECTURE & HULL CONFIGURATOR</div>
+          <p class="text-[11px] text-slate-400">Load a hull preset or customize stats, megadamage hardpoints, mortgage debt, and modular deck compartments.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-slate-400 text-[11px]">PRESETS:</span>
+          <button onclick="loadPreset('endless_waltz')" class="btn-amber px-2.5 py-1 font-bold">THE ENDLESS WALTZ</button>
+          <button onclick="loadPreset('blockade_runner')" class="btn-crt px-2.5 py-1 font-bold">BLOCKADE RUNNER</button>
+          <button onclick="loadPreset('salvage_cutter')" class="btn-crt px-2.5 py-1 font-bold">SALVAGE CUTTER</button>
+          <button onclick="loadPreset('blank_hull')" class="btn-crt px-2.5 py-1 font-bold">BLANK HULL</button>
+        </div>
+      </div>
+
+      <!-- 3-Column Builder Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- Column 1: Core Hull Stats & Financials (4 cols) -->
+        <section class="lg:col-span-4 space-y-4">
+          <div class="panel-box p-3 space-y-3">
+            <div class="font-display text-xs font-bold text-amber-400 border-b border-slate-800 pb-1.5">
+              01 // VESSEL REGISTRY & 1E CHASSIS STATS
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 text-xs">
+              <div class="col-span-2">
+                <label class="block text-[10px] text-slate-400 mb-0.5">Ship Name</label>
+                <input id="inpShipName" type="text" oninput="updateShipMeta('name', this.value)" class="w-full font-bold text-amber-300" />
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Ship Class</label>
+                <select id="inpShipClass" onchange="updateShipMeta('shipClass', this.value)" class="w-full">
+                  <option value="Courier / Dropship">Courier / Dropship</option>
+                  <option value="Blockade Runner">Blockade Runner</option>
+                  <option value="Salvage Cutter">Salvage Cutter</option>
+                  <option value="Corporate Freighter">Corporate Freighter</option>
+                  <option value="Patrol Frigate">Patrol Frigate</option>
+                  <option value="Research Vessel">Research Vessel</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Transponder ID</label>
+                <input id="inpTransponder" type="text" oninput="updateShipMeta('transponder', this.value)" class="w-full text-cyan-300" />
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Hull Points (Current / Max)</label>
+                <div class="flex gap-1">
+                  <input id="inpHullCurrent" type="number" min="0" onchange="updateShipStat('hullCurrent', parseInt(this.value)||0)" class="w-1/2 text-emerald-400 font-bold" />
+                  <input id="inpHullMax" type="number" min="1" onchange="updateShipStat('hullMax', parseInt(this.value)||1)" class="w-1/2" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Armor (AP)</label>
+                <input id="inpArmor" type="number" min="0" max="50" onchange="updateShipStat('armor', parseInt(this.value)||0)" class="w-full font-bold text-amber-300" />
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Thrusters (Sublight)</label>
+                <input id="inpThrusters" type="number" min="0" max="99" onchange="updateShipStat('thrusters', parseInt(this.value)||0)" class="w-full" />
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Jump Drive Rating</label>
+                <select id="inpJumpDrive" onchange="updateShipStat('jumpRating', parseInt(this.value)||1)" class="w-full font-bold text-cyan-300">
+                  <option value="0">0 (Sublight Only)</option>
+                  <option value="1">Jump-1 (1 Parsec)</option>
+                  <option value="2">Jump-2 (2 Parsecs)</option>
+                  <option value="3">Jump-3 (3 Parsecs)</option>
+                  <option value="4">Jump-4 (Military)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Fuel Cells (Current / Max)</label>
+                <div class="flex gap-1">
+                  <input id="inpFuelCurrent" type="number" min="0" onchange="updateShipStat('fuelCurrent', parseInt(this.value)||0)" class="w-1/2 text-amber-300 font-bold" />
+                  <input id="inpFuelMax" type="number" min="1" onchange="updateShipStat('fuelMax', parseInt(this.value)||1)" class="w-1/2" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Crew Capacity (Active / Max)</label>
+                <div class="flex gap-1">
+                  <input id="inpCrewCurrent" type="number" min="0" onchange="updateShipStat('crewCurrent', parseInt(this.value)||0)" class="w-1/2" />
+                  <input id="inpCrewMax" type="number" min="1" onchange="updateShipStat('crewMax', parseInt(this.value)||1)" class="w-1/2" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mortgage, Credits & Upkeep Tracker -->
+          <div class="panel-box p-3 space-y-2.5">
+            <div class="font-display text-xs font-bold text-emerald-400 border-b border-slate-800 pb-1.5">
+              02 // CORPORATE LEDGER, MORTGAGE & UPKEEP
+            </div>
+            <div class="grid grid-cols-2 gap-2.5 text-xs">
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Crew Credits (cr)</label>
+                <input id="inpCredits" type="number" step="500" onchange="updateShipFinance('credits', parseInt(this.value)||0)" class="w-full font-bold text-emerald-400" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Monthly Upkeep (cr)</label>
+                <input id="inpUpkeep" type="number" step="500" onchange="updateShipFinance('monthlyUpkeep', parseInt(this.value)||0)" class="w-full text-amber-300" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Total Hull Mortgage (cr)</label>
+                <input id="inpDebt" type="number" step="10000" onchange="updateShipFinance('totalDebt', parseInt(this.value)||0)" class="w-full text-red-400 font-bold" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Days Until Payment Due</label>
+                <input id="inpPaymentDays" type="number" min="0" onchange="updateShipFinance('daysUntilDue', parseInt(this.value)||0)" class="w-full" />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Column 2: Modular Room / Deck Blueprint Grid (5 cols) -->
+        <section class="lg:col-span-5 panel-box p-3 flex flex-col space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-1.5">
+            <div>
+              <div class="font-display text-xs font-bold text-cyan-400">03 // MODULAR DECK BLUEPRINT GRID</div>
+              <p class="text-[10px] text-slate-400">Click a room to edit or resize • Add standard 1E compartments</p>
+            </div>
+            <div class="flex items-center gap-1">
+              <select id="newRoomTypeSelect" class="text-[11px] py-1">
+                <option value="Bridge">Bridge</option>
+                <option value="Engine Room">Engine Room</option>
+                <option value="Medbay">Medbay</option>
+                <option value="Cargo Hold">Cargo Hold</option>
+                <option value="Quarters">Quarters</option>
+                <option value="Galley">Galley</option>
+                <option value="Airlock">Airlock</option>
+                <option value="Armory">Armory</option>
+                <option value="Cryo Vault">Cryo Vault</option>
+                <option value="Sensor Array">Sensor Array</option>
+              </select>
+              <button onclick="addDeckRoom()" class="btn-amber px-2 py-1 text-xs font-bold">+ ADD</button>
+            </div>
+          </div>
+
+          <!-- Visual Deck Grid -->
+          <div class="deck-grid-bg border border-slate-800 p-3 rounded flex-1 min-h-[300px]">
+            <div id="builderDeckGrid" class="grid grid-cols-4 gap-2 auto-rows-[86px]"></div>
+          </div>
+
+          <!-- Selected Room Editor -->
+          <div id="builderRoomInspector" class="bg-black/60 border border-slate-800 p-2.5 rounded space-y-2 text-xs">
+            <!-- Populated dynamically -->
+          </div>
+        </section>
+
+        <!-- Column 3: Megadamage Weapons, Upgrades & Ship Logs (3 cols) -->
+        <section class="lg:col-span-3 space-y-4">
+          <div class="panel-box p-3 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span class="font-display text-xs font-bold text-red-400">04 // HARDPOINTS & MEGADAMAGE</span>
+              <button onclick="addWeaponMount()" class="text-[11px] text-red-400 hover:underline font-bold">+ Mount</button>
+            </div>
+            <div id="builderWeaponsList" class="space-y-2 max-h-60 overflow-y-auto"></div>
+          </div>
+
+          <div class="panel-box p-3 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span class="font-display text-xs font-bold text-amber-400">05 // INSTALLED MODULES & CARGO</span>
+              <button onclick="addCustomCargoItem()" class="text-[11px] text-amber-400 hover:underline font-bold">+ Item</button>
+            </div>
+            <div id="builderCargoList" class="space-y-1.5 max-h-48 overflow-y-auto text-xs"></div>
+          </div>
+
+          <div class="panel-box p-3 space-y-2">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span class="font-display text-xs font-bold text-cyan-400">06 // SHIP'S LOG ENTRIES</span>
+              <button onclick="addShipLog()" class="text-[11px] text-cyan-400 hover:underline font-bold">+ Log</button>
+            </div>
+            <div id="builderLogsList" class="space-y-2 max-h-52 overflow-y-auto text-xs"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- ==================== MODE 2: SHIP TERMINAL (PLAYER OS) ==================== -->
+    <main id="viewTerminal" class="hidden flex-1 p-3 sm:p-4 space-y-4">
+      <!-- Top Telemetry Banner -->
+      <div id="shipTerminalBanner" class="panel-box p-3 sm:p-4 flex flex-wrap items-center justify-between gap-4 border-emerald-500/40">
+        <div class="flex items-center gap-3">
+          <div class="px-2.5 py-1 bg-emerald-950/80 border border-emerald-400 text-emerald-300 text-xs font-bold">
+            OS: ONLINE
+          </div>
+          <div>
+            <h1 id="termShipTitle" class="font-display text-lg sm:text-xl font-bold text-emerald-400 glow-green">
+              USCSS THE ENDLESS WALTZ // ONBOARD OS
+            </h1>
+            <div id="termShipMeta" class="text-[11px] text-slate-400">
+              CLASS: COURIER / DROPSHIP • TRANSPONDER: EW-3A-904 • JUMP-2 RATED
+            </div>
+          </div>
+        </div>
+
+        <!-- Emergency Controls -->
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnRedAlert" onclick="toggleRedAlert()" class="btn-crimson px-3 py-1.5 text-xs font-bold tracking-wider">
+            [ TOGGLE RED ALERT ]
+          </button>
+          <button onclick="triggerDistressBeacon()" class="btn-amber px-3 py-1.5 text-xs font-bold tracking-wider">
+            [ BROADCAST SOS ]
+          </button>
+        </div>
+      </div>
+
+      <!-- Alert Strip -->
+      <div id="termAlertBar" class="hidden p-2.5 bg-red-950/90 border border-red-500 text-red-200 text-xs font-bold flex items-center justify-between rounded">
+        <span id="termAlertText">WARNING: GENERAL QUARTERS / RED ALERT ENGAGED</span>
+        <button onclick="dismissTermAlert()" class="underline text-[11px] hover:text-white">DISMISS</button>
+      </div>
+
+      <!-- Core Vital Gauges (4 Cards) -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="panel-box p-3 space-y-1.5">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>HULL INTEGRITY</span>
+            <span id="termArmorBadge" class="text-amber-400 font-bold">ARMOR: 4 AP</span>
+          </div>
+          <div id="termHullText" class="font-display text-xl font-bold text-emerald-400">40 / 40 HP</div>
+          <div class="w-full h-2 bg-slate-900 rounded overflow-hidden">
+            <div id="termHullBar" class="h-full bg-emerald-500 transition-all" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="panel-box p-3 space-y-1.5">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>REACTION FUEL</span>
+            <span id="termThrusterBadge" class="text-cyan-400 font-bold">THRUST: 35</span>
+          </div>
+          <div id="termFuelText" class="font-display text-xl font-bold text-amber-400">6 / 8 CELLS</div>
+          <div class="w-full h-2 bg-slate-900 rounded overflow-hidden">
+            <div id="termFuelBar" class="h-full bg-amber-400 transition-all" style="width: 75%"></div>
+          </div>
+        </div>
+
+        <div class="panel-box p-3 space-y-1.5">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>LIFE SUPPORT & CREW</span>
+            <span class="text-emerald-400 font-bold">O2: 98.4%</span>
+          </div>
+          <div id="termCrewText" class="font-display text-xl font-bold text-slate-100">4 / 6 CREW</div>
+          <div class="text-[11px] text-slate-400">Scrubbers Nominal • Temp 19°C</div>
+        </div>
+
+        <div class="panel-box p-3 space-y-1.5">
+          <div class="flex justify-between text-[11px] text-slate-400">
+            <span>MORTGAGE & CREDITS</span>
+            <span id="termDueBadge" class="text-red-400 font-bold">DUE: 14D</span>
+          </div>
+          <div id="termCreditsText" class="font-display text-xl font-bold text-emerald-400">12,500 cr</div>
+          <div id="termDebtText" class="text-[11px] text-red-400 truncate">Debt: 420,000 cr (4,500/mo)</div>
+        </div>
+      </div>
+
+      <!-- Main Ship Terminal Workspace -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- Left 7 Cols: Interactive Deck Schematic + Damage Toggles -->
+        <div class="lg:col-span-7 panel-box p-3 sm:p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+            <div>
+              <div class="font-display text-xs font-bold text-emerald-400">INTERACTIVE DECK SCHEMATIC & DAMAGE CONTROL</div>
+              <p class="text-[11px] text-slate-400">Click any compartment to cycle system status: ONLINE → DAMAGED → OFFLINE</p>
+            </div>
+            <div class="flex items-center gap-2 text-[10px] font-bold">
+              <span class="text-emerald-400">● ONLINE</span>
+              <span class="text-amber-400">▲ DAMAGED</span>
+              <span class="text-red-400">✕ OFFLINE</span>
+            </div>
+          </div>
+
+          <div class="deck-grid-bg border border-slate-800 p-3 rounded">
+            <div id="terminalDeckGrid" class="grid grid-cols-4 gap-2.5 auto-rows-[92px]"></div>
+          </div>
+
+          <!-- Hardpoints / Weapons Firing Control -->
+          <div class="space-y-2 pt-1">
+            <div class="font-display text-xs font-bold text-red-400">ORDNANCE & MEGADAMAGE HARDPOINTS</div>
+            <div id="terminalWeaponsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2"></div>
+          </div>
+        </div>
+
+        <!-- Right 5 Cols: Jump Drive Plotter, Ship Logs & Cargo Manifest -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- Jump Drive Plot Calculator -->
+          <div class="panel-box p-3 sm:p-4 space-y-3 border-cyan-500/30">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+              <span class="font-display text-xs font-bold text-cyan-400">JUMP DRIVE ASTROGATION PLOTTER</span>
+              <span id="termJumpRatingBadge" class="text-xs font-bold text-cyan-300">MAX: JUMP-2</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Destination Sector</label>
+                <input id="jumpDestInput" type="text" value="BEACON 3A-R3D // RIMWARD" class="w-full text-cyan-200" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-slate-400 mb-0.5">Jump Distance (Parsecs)</label>
+                <select id="jumpDistSelect" onchange="updateJumpCalc()" class="w-full">
+                  <option value="1">1 Parsec (1 Fuel Cell)</option>
+                  <option value="2">2 Parsecs (2 Fuel Cells)</option>
+                  <option value="3">3 Parsecs (3 Fuel Cells)</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="jumpCalcReadout" class="p-2.5 bg-black/70 border border-slate-800 text-xs space-y-1">
+              <!-- Populated dynamically -->
+            </div>
+
+            <button id="btnExecuteJump" onclick="executeJumpPlot()" class="btn-amber w-full py-2 text-xs font-bold tracking-wider">
+              ENGAGE JUMP COILS & CONSUME FUEL
+            </button>
+          </div>
+
+          <!-- Ship's Log Viewer -->
+          <div class="panel-box p-3 sm:p-4 space-y-2.5">
+            <div class="font-display text-xs font-bold text-amber-400 border-b border-slate-800 pb-1.5">
+              CAPTAIN'S & MISSION LOG ARCHIVE
+            </div>
+            <div id="terminalLogsList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+          </div>
+
+          <!-- Hold & Installed Modules -->
+          <div class="panel-box p-3 sm:p-4 space-y-2">
+            <div class="font-display text-xs font-bold text-emerald-400 border-b border-slate-800 pb-1.5">
+              CARGO HOLD & REQUISITIONED GEAR
+            </div>
+            <div id="terminalCargoManifest" class="flex flex-wrap gap-1.5 text-xs"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================== MODE 3: SHOP TERMINAL ==================== -->
+    <main id="viewShop" class="hidden flex-1 p-3 sm:p-4 space-y-4">
+      <!-- Corporate Port Authority Header & Tier Selector -->
+      <div class="panel-box p-3 sm:p-4 flex flex-wrap items-center justify-between gap-4 border-amber-500/40">
+        <div>
+          <div class="text-[10px] text-amber-400 font-bold tracking-widest">PORT AUTHORITY // DRYDOCK & SUPPLY NETWORK</div>
+          <h1 class="font-display text-lg sm:text-xl font-bold text-white mt-0.5">
+            VANGUARD REQUISITION & DRYDOCK OS
+          </h1>
+          <p id="shopTierDesc" class="text-[11px] text-slate-400 mt-0.5">
+            Standard Mid-Rim commercial port. Baseline corporate pricing and moderate stock availability.
+          </p>
+        </div>
+
+        <!-- Station Tech / Wealth Tier Selector -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="text-xs">
+            <label class="block text-[10px] text-slate-400 mb-0.5">STATION TECH / WEALTH TIER</label>
+            <select id="shopTierSelect" onchange="setShopTier(this.value)" class="font-bold text-amber-300 border-amber-500/50">
+              <option value="frontier">TIER 1: FRONTIER OUTPOST (1.35x Price • Scarcity)</option>
+              <option value="midrim" selected>TIER 2: MID-RIM HUB (1.00x Price • Standard)</option>
+              <option value="core">TIER 3: CORE CORPORATE SHIPYARD (0.85x Price • Full Spec)</option>
+            </select>
+          </div>
+          <div class="px-3 py-1.5 bg-black/70 border border-emerald-500/40 text-right">
+            <div class="text-[10px] text-slate-400">AVAILABLE CREW CREDITS</div>
+            <div id="shopCreditsDisplay" class="font-display text-base font-bold text-emerald-400">12,500 cr</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shop Main Split: Catalog (8 cols) + Requisition Cart & Drydock (4 cols) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- Catalog Side (8 cols) -->
+        <div class="lg:col-span-8 space-y-3">
+          <!-- Category Tabs -->
+          <div class="flex flex-wrap gap-2">
+            <button id="shopCatShip" onclick="setShopCategory('ship')" class="px-3 py-1.5 text-xs font-bold border transition">
+              [ SHIP UPGRADES & WEAPONS ]
+            </button>
+            <button id="shopCatGear" onclick="setShopCategory('gear')" class="px-3 py-1.5 text-xs font-bold border transition">
+              [ CREW GEAR & LOADOUTS ]
+            </button>
+            <button id="shopCatDrydock" onclick="setShopCategory('drydock')" class="px-3 py-1.5 text-xs font-bold border transition">
+              [ DRYDOCK REPAIRS & REFUEL ]
+            </button>
+          </div>
+
+          <!-- Catalog Items Grid -->
+          <div id="shopCatalogGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Requisition Cart & Instant Receipt (4 cols) -->
+        <div class="lg:col-span-4 space-y-4">
+          <div class="panel-box p-3 sm:p-4 space-y-3 border-emerald-500/40">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span class="font-display text-xs font-bold text-emerald-400">REQUISITION MANIFEST (CART)</span>
+              <button onclick="clearShopCart()" class="text-[11px] text-slate-400 hover:text-red-400">CLEAR</button>
+            </div>
+
+            <div id="shopCartList" class="space-y-2 max-h-64 overflow-y-auto text-xs">
+              <div class="text-slate-500 italic">Cart is empty. Select upgrades, gear, or drydock services.</div>
+            </div>
+
+            <div class="border-t border-slate-800 pt-2.5 space-y-1.5 text-xs">
+              <div class="flex justify-between text-slate-400">
+                <span>Subtotal (Tier Adjusted):</span>
+                <span id="cartSubtotalText" class="font-bold text-white">0 cr</span>
+              </div>
+              <div class="flex justify-between text-slate-400">
+                <span>Remaining Balance After Purchase:</span>
+                <span id="cartRemainingText" class="font-bold text-emerald-400">12,500 cr</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-2 pt-1">
+              <button id="btnCheckoutCash" onclick="checkoutShop('cash')" class="btn-green py-2 text-xs font-bold tracking-wider">
+                AUTHORIZE & PUSH TO SHIP (PAY CREDITS)
+              </button>
+              <button id="btnCheckoutDebt" onclick="checkoutShop('debt')" class="btn-amber py-1.5 text-xs font-bold tracking-wider">
+                FINANCE ON SHIP MORTGAGE (+10% INTEREST)
+              </button>
+            </div>
+          </div>
+
+          <!-- Last Generated Corporate Receipt -->
+          <div id="shopReceiptBox" class="hidden panel-box p-3.5 bg-black/80 border-amber-400/60 space-y-2 text-xs font-mono">
+            <div class="flex items-center justify-between border-b border-dashed border-slate-700 pb-1.5">
+              <span class="font-bold text-amber-400">PORT AUTHORITY RECEIPT</span>
+              <span id="receiptTimestamp" class="text-[10px] text-slate-400"></span>
+            </div>
+            <div id="receiptBody" class="space-y-1 text-[11px] text-slate-300 whitespace-pre-line"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="builder-validation.js"></script>
+  <script src="builder-storage.js"></script>
+  <script>
+    // =========================================================================
+    // SHIP PRESETS (MOTHERSHIP 1E RULESET)
+    // =========================================================================
+    const SHIP_PRESETS = {
+      endless_waltz: {
+        name: "The Endless Waltz",
+        shipClass: "Courier / Dropship",
+        transponder: "EW-3A-904",
+        hullCurrent: 40,
+        hullMax: 40,
+        armor: 4,
+        thrusters: 35,
+        jumpRating: 2,
+        fuelCurrent: 6,
+        fuelMax: 8,
+        crewCurrent: 4,
+        crewMax: 6,
+        credits: 12500,
+        monthlyUpkeep: 4500,
+        totalDebt: 420000,
+        daysUntilDue: 14,
+        redAlert: false,
+        rooms: [
+          { id: "r1", type: "Bridge", name: "Flight Bridge", status: "ONLINE", span: 2, notes: "Astrogation, sensor suite & docking clamp controls." },
+          { id: "r2", type: "Airlock", name: "Dorsal Docking Rig", status: "ONLINE", span: 1, notes: "Magnetic umbilical collar & vaccsuit lockers." },
+          { id: "r3", type: "Medbay", name: "Auto-Doc Medbay", status: "ONLINE", span: 1, notes: "1x Surgical pod, trauma stims, cryo-stabilizer." },
+          { id: "r4", type: "Quarters", name: "Crew Berths", status: "ONLINE", span: 2, notes: "6x bunks, personal lockers, radiation shielding." },
+          { id: "r5", type: "Galley", name: "Mess & Life Support", status: "ONLINE", span: 2, notes: "O2 scrubbers, water recycler & synth-rations." },
+          { id: "r6", type: "Cargo Hold", name: "Main Cargo Bay", status: "ONLINE", span: 2, notes: "Reinforced deck clamps for heavy salvage modules." },
+          { id: "r7", type: "Engine Room", name: "Sublight & Jump Core", status: "ONLINE", span: 2, notes: "Dual fusion thrusters + Jump-2 folding coils." }
+        ],
+        weapons: [
+          { id: "w1", name: "Twin Autocannon Turret", damage: "2d10 MDMG", range: "Close", status: "ONLINE" },
+          { id: "w2", name: "Mining Laser Cutter", damage: "1d10 MDMG", range: "Adjacent", status: "ONLINE" }
+        ],
+        cargo: [
+          "4x Standard Vaccsuits",
+          "2x Cutting Torches",
+          "1x Portable Medscanner",
+          "Beacon 3A-R3D Salvage Contract"
+        ],
+        logs: [
+          {
+            id: "l1",
+            title: "CONTRACT // BEACON 3A-R3D",
+            date: "2194.11.22",
+            body: "Chartered by VAD Special Projects to investigate dark transponder at Beacon 3A-R3D. Approach vector plotted; docking clamps aligned."
+          },
+          {
+            id: "l2",
+            title: "MAINTENANCE // JUMP COIL #2",
+            date: "2194.11.18",
+            body: "Replaced thermal coupling on port jump coil. Fuel consumption nominal at 1 cell per parsec."
+          }
+        ]
+      },
+      blockade_runner: {
+        name: "Nightjar",
+        shipClass: "Blockade Runner",
+        transponder: "NJ-99-BLK",
+        hullCurrent: 55,
+        hullMax: 55,
+        armor: 6,
+        thrusters: 50,
+        jumpRating: 3,
+        fuelCurrent: 10,
+        fuelMax: 10,
+        crewCurrent: 5,
+        crewMax: 8,
+        credits: 24000,
+        monthlyUpkeep: 8200,
+        totalDebt: 890000,
+        daysUntilDue: 9,
+        redAlert: false,
+        rooms: [
+          { id: "r1", type: "Bridge", name: "Armored CIC Bridge", status: "ONLINE", span: 2, notes: "ECM suite & stealth thermal bafflers." },
+          { id: "r2", type: "Armory", name: "Munitions Locker", status: "ONLINE", span: 2, notes: "Boarding shotguns, pulse rifles & flak vests." },
+          { id: "r3", type: "Quarters", name: "Crew Bunks", status: "ONLINE", span: 2, notes: "8x crash couches." },
+          { id: "r4", type: "Medbay", name: "Trauma Bay", status: "ONLINE", span: 1, notes: "Emergency triage station." },
+          { id: "r5", type: "Airlock", name: "Ventral Breach Lock", status: "ONLINE", span: 1, notes: "Rapid decompression boarding hatch." },
+          { id: "r6", type: "Cargo Hold", name: "Shielded Smuggler Hold", status: "ONLINE", span: 2, notes: "Lead-lined hidden compartment." },
+          { id: "r7", type: "Engine Room", name: "Overcharged Drive Bay", status: "ONLINE", span: 2, notes: "Military-spec Jump-3 drive." }
+        ],
+        weapons: [
+          { id: "w1", name: "Railgun Battery", damage: "3d10 MDMG", range: "Long", status: "ONLINE" },
+          { id: "w2", name: "Point-Defense Flak", damage: "1d10 MDMG", range: "Close", status: "ONLINE" }
+        ],
+        cargo: ["6x Combat Vaccsuits", "ECM Chaff Pod", "3x Breaching Charges"],
+        logs: [
+          { id: "l1", title: "DISPATCH // RIMWARD PATROL", date: "2194.11.20", body: "Evaded corporate customs picket near Prospero's Dream." }
+        ]
+      },
+      salvage_cutter: {
+        name: "Rustbucket IV",
+        shipClass: "Salvage Cutter",
+        transponder: "RB-04-SLV",
+        hullCurrent: 32,
+        hullMax: 35,
+        armor: 2,
+        thrusters: 25,
+        jumpRating: 1,
+        fuelCurrent: 4,
+        fuelMax: 6,
+        crewCurrent: 3,
+        crewMax: 4,
+        credits: 4200,
+        monthlyUpkeep: 2800,
+        totalDebt: 185000,
+        daysUntilDue: 6,
+        redAlert: false,
+        rooms: [
+          { id: "r1", type: "Bridge", name: "Spotter Cockpit", status: "ONLINE", span: 2, notes: "Floodlights, tractor winches & salvage grapple." },
+          { id: "r2", type: "Airlock", name: "EVA Cutting Bay", status: "ONLINE", span: 2, notes: "Heavy mag-boots & plasma cutters." },
+          { id: "r3", type: "Cargo Hold", name: "Scrap Compactor Hold", status: "ONLINE", span: 2, notes: "High-capacity magnetic cargo net." },
+          { id: "r4", type: "Engine Room", name: "Patchwork Reactor", status: "DAMAGED", span: 2, notes: "Runs hot; rattles above 60% thrust." }
+        ],
+        weapons: [
+          { id: "w1", name: "Heavy Grapple Harpoon", damage: "1d10 MDMG", range: "Close", status: "ONLINE" }
+        ],
+        cargo: ["3x Patched Vaccsuits", "Industrial Welder", "200m Steel Cable"],
+        logs: [
+          { id: "l1", title: "LOG // SCRAP HAUL", date: "2194.11.15", body: "Sold 4 tons of reactor shielding at local scrapyard. Barely covered fuel." }
+        ]
+      },
+      blank_hull: {
+        name: "Unnamed Hull",
+        shipClass: "Courier / Dropship",
+        transponder: "UNREG-000",
+        hullCurrent: 30,
+        hullMax: 30,
+        armor: 2,
+        thrusters: 30,
+        jumpRating: 1,
+        fuelCurrent: 5,
+        fuelMax: 5,
+        crewCurrent: 1,
+        crewMax: 4,
+        credits: 10000,
+        monthlyUpkeep: 3000,
+        totalDebt: 250000,
+        daysUntilDue: 30,
+        redAlert: false,
+        rooms: [
+          { id: "r1", type: "Bridge", name: "Command Bridge", status: "ONLINE", span: 2, notes: "Primary helm & comms." },
+          { id: "r2", type: "Engine Room", name: "Main Engineering", status: "ONLINE", span: 2, notes: "Reactor & jump drive." }
+        ],
+        weapons: [],
+        cargo: [],
+        logs: []
+      }
+    };
+
+    // =========================================================================
+    // SHOP CATALOG DATA (SHIP UPGRADES, CREW GEAR, DRYDOCK SERVICES)
+    // =========================================================================
+    const SHOP_CATALOG = [
+      // SHIP UPGRADES & WEAPONS
+      {
+        id: "up_railgun",
+        category: "ship",
+        minTier: 2,
+        name: "Heavy Railgun Hardpoint",
+        basePrice: 18000,
+        tag: "WEAPON // 3d10 MDMG",
+        desc: "Magnetic kinetic accelerator turret. Installs directly onto ship weapons manifest.",
+        applyEffect: (ship) => {
+          ship.weapons.push({ id: "w_" + crypto.randomUUID(), name: "Heavy Railgun Hardpoint", damage: "3d10 MDMG", range: "Long", status: "ONLINE" });
+        }
+      },
+      {
+        id: "up_autocannon",
+        category: "ship",
+        minTier: 1,
+        name: "Rotary Autocannon Pod",
+        basePrice: 8500,
+        tag: "WEAPON // 2d10 MDMG",
+        desc: "Close-defense ballistic turret for asteroid clearance and hostile boarding deterrence.",
+        applyEffect: (ship) => {
+          ship.weapons.push({ id: "w_" + crypto.randomUUID(), name: "Rotary Autocannon Pod", damage: "2d10 MDMG", range: "Close", status: "ONLINE" });
+        }
+      },
+      {
+        id: "up_armor",
+        category: "ship",
+        minTier: 1,
+        name: "Ablative Ceramic Hull Plating",
+        basePrice: 12000,
+        tag: "HULL // +2 ARMOR AP",
+        desc: "Bolted composite armor plates that reinforce hull deflection against megadamage.",
+        applyEffect: (ship) => {
+          ship.armor += 2;
+        }
+      },
+      {
+        id: "up_jump",
+        category: "ship",
+        minTier: 3,
+        name: "Military Jump-Coil Overdrive",
+        basePrice: 35000,
+        tag: "DRIVE // +1 JUMP RATING",
+        desc: "High-grade sub-space folding coils increasing maximum jump range by +1 Parsec.",
+        applyEffect: (ship) => {
+          ship.jumpRating = Math.min(4, ship.jumpRating + 1);
+        }
+      },
+      {
+        id: "up_fueltank",
+        category: "ship",
+        minTier: 1,
+        name: "Auxiliary Deuterium Fuel Pod",
+        basePrice: 6000,
+        tag: "FUEL // +2 MAX CELLS",
+        desc: "External strapped reserve fuel manifold (+2 Max Fuel Capacity, pre-filled).",
+        applyEffect: (ship) => {
+          ship.fuelMax += 2;
+          ship.fuelCurrent += 2;
+        }
+      },
+      {
+        id: "up_medpod",
+        category: "ship",
+        minTier: 2,
+        name: "Automated Trauma Auto-Doc",
+        basePrice: 15000,
+        tag: "ROOM // MEDBAY UPGRADE",
+        desc: "Installs a full surgical Auto-Doc compartment onto the ship's deck blueprint.",
+        applyEffect: (ship) => {
+          ship.rooms.push({
+            id: "r_" + crypto.randomUUID(),
+            type: "Medbay",
+            name: "Auto-Doc Surgical Suite",
+            status: "ONLINE",
+            span: 2,
+            notes: "Automated robotic surgeon & cryo-stasis pod."
+          });
+        }
+      },
+
+      // CREW GEAR & LOADOUTS
+      {
+        id: "gear_vaccsuit",
+        category: "gear",
+        minTier: 1,
+        name: "Heavy Hazard Vaccsuit (x1)",
+        basePrice: 1500,
+        tag: "EVA // ARMOR +3",
+        desc: "Reinforced deep-space EVA suit with 6-hour O2 supply, mag-boots, and rad-shielding.",
+        applyEffect: (ship) => {
+          ship.cargo.push("Heavy Hazard Vaccsuit");
+        }
+      },
+      {
+        id: "gear_pulserifle",
+        category: "gear",
+        minTier: 2,
+        name: "Armat M41A Pulse Rifle + 4 Mags",
+        basePrice: 2400,
+        tag: "WEAPON // 3d10 DMG",
+        desc: "Caseless 10mm explosive-tip assault rifle with digital ammo counter.",
+        applyEffect: (ship) => {
+          ship.cargo.push("Pulse Rifle + 4x Caseless Mags");
+        }
+      },
+      {
+        id: "gear_smartgun",
+        category: "gear",
+        minTier: 3,
+        name: "Harnessed Smart-Gun System",
+        basePrice: 6500,
+        tag: "HEAVY // 4d10 DMG",
+        desc: "Gyro-stabilized auto-tracking heavy weapon with motion-linked HUD.",
+        applyEffect: (ship) => {
+          ship.cargo.push("Harnessed Smart-Gun System");
+        }
+      },
+      {
+        id: "gear_cyber_rig",
+        category: "gear",
+        minTier: 3,
+        name: "Neural Interface Jack (Cyberware)",
+        basePrice: 5000,
+        tag: "CYBERNETIC // +15 COMPUTERS",
+        desc: "Direct cortical data-port granting Advantage on terminal hacking and ship astrogation.",
+        applyEffect: (ship) => {
+          ship.cargo.push("Cybernetic Neural Interface Jack");
+        }
+      },
+      {
+        id: "gear_medkit",
+        category: "gear",
+        minTier: 1,
+        name: "Trauma Stimpak Crate (6-Pack)",
+        basePrice: 900,
+        tag: "MEDICAL // FIELD HEAL",
+        desc: "Military-grade coagulants, synthetic adrenaline, and radiation scrubbers.",
+        applyEffect: (ship) => {
+          ship.cargo.push("Trauma Stimpak Crate (6x)");
+        }
+      },
+      {
+        id: "gear_motion",
+        category: "gear",
+        minTier: 1,
+        name: "Handheld Motion Tracker",
+        basePrice: 1200,
+        tag: "SENSOR // 30M RANGE",
+        desc: "Doppler acoustic/movement scanner. Pings approaching contacts through bulkheads.",
+        applyEffect: (ship) => {
+          ship.cargo.push("Handheld Motion Tracker");
+        }
+      },
+
+      // DRYDOCK REPAIRS & REFUEL
+      {
+        id: "dry_refuel_1",
+        category: "drydock",
+        minTier: 1,
+        name: "Refuel +1 Reaction Fuel Cell",
+        basePrice: 500,
+        tag: "SERVICE // +1 FUEL",
+        desc: "Standard refined deuterium fuel cell transfer via port umbilical.",
+        applyEffect: (ship) => {
+          ship.fuelCurrent = Math.min(ship.fuelMax, ship.fuelCurrent + 1);
+        }
+      },
+      {
+        id: "dry_refuel_full",
+        category: "drydock",
+        minTier: 1,
+        name: "Full Tank Refuel (Top Off)",
+        basePrice: 2200,
+        tag: "SERVICE // MAX FUEL",
+        desc: "Fills all ship fuel cells to maximum capacity.",
+        applyEffect: (ship) => {
+          ship.fuelCurrent = ship.fuelMax;
+        }
+      },
+      {
+        id: "dry_hull_10",
+        category: "drydock",
+        minTier: 1,
+        name: "Hull Patch & Weld (+10 HP)",
+        basePrice: 2500,
+        tag: "REPAIR // +10 HULL HP",
+        desc: "Drydock robotic welders seal micro-fractures and replace buckled hull plates.",
+        applyEffect: (ship) => {
+          ship.hullCurrent = Math.min(ship.hullMax, ship.hullCurrent + 10);
+        }
+      },
+      {
+        id: "dry_systems_all",
+        category: "drydock",
+        minTier: 1,
+        name: "Full Compartment & Hardpoint Overhaul",
+        basePrice: 4000,
+        tag: "REPAIR // ALL ONLINE",
+        desc: "Restores all DAMAGED or OFFLINE ship rooms and weapons back to ONLINE status.",
+        applyEffect: (ship) => {
+          ship.rooms.forEach(r => (r.status = "ONLINE"));
+          ship.weapons.forEach(w => (w.status = "ONLINE"));
+        }
+      }
+    ];
+
+    const TIER_CONFIG = {
+      frontier: {
+        level: 1,
+        mult: 1.35,
+        desc: "Frontier Outpost: Scarce military hardware, inflated black-market markups (1.35x base price)."
+      },
+      midrim: {
+        level: 2,
+        mult: 1.0,
+        desc: "Mid-Rim Hub: Standard commercial drydock pricing (1.00x base price) and reliable stock."
+      },
+      core: {
+        level: 3,
+        mult: 0.85,
+        desc: "Core Corporate Shipyard: High-tech military & cybernetic catalog with bulk fleet discounts (0.85x base price)."
+      }
+    };
+
+    // =========================================================================
+    // APPLICATION STATE
+    // =========================================================================
+    const projectStorage = createBuilderStorage("mothership_shipyard_os_v1", BUILDER_VALIDATION.ship,
+      () => JSON.parse(JSON.stringify(SHIP_PRESETS.endless_waltz)));
+    let ship = loadShipState();
+    let currentMode = "builder"; // 'builder' | 'terminal' | 'shop'
+    let selectedRoomId = ship.rooms[0]?.id || null;
+    let viewportSize = "wide"; // 'compact' | 'standard' | 'wide'
+    let crtScale = 1.0;
+
+    // Shop State
+    let shopTier = "midrim";
+    let shopCategory = "ship";
+    let shopCart = [];
+
+    function loadShipState() {
+      return projectStorage.load();
+    }
+
+    function saveShipState() {
+      projectStorage.save(ship);
+    }
+
+    // =========================================================================
+    // NAVIGATION & UI VIEWPORT / CRT SIZER CONTROLS
+    // =========================================================================
+    function switchMode(mode) {
+      currentMode = mode;
+      document.getElementById("viewBuilder").classList.toggle("hidden", mode !== "builder");
+      document.getElementById("viewTerminal").classList.toggle("hidden", mode !== "terminal");
+      document.getElementById("viewShop").classList.toggle("hidden", mode !== "shop");
+
+      const tabs = {
+        builder: document.getElementById("tabBuilder"),
+        terminal: document.getElementById("tabTerminal"),
+        shop: document.getElementById("tabShop")
+      };
+
+      Object.entries(tabs).forEach(([key, el]) => {
+        if (key === mode) {
+          el.className = "px-2.5 py-1 text-xs font-bold tracking-wider transition rounded bg-amber-400 text-black";
+        } else {
+          el.className = "px-2.5 py-1 text-xs font-bold tracking-wider transition rounded text-slate-400 hover:text-white";
+        }
+      });
+
+      renderAll();
+    }
+
+    function setViewportSize(size) {
+      viewportSize = size;
+      const frame = document.getElementById("appViewportFrame");
+      frame.classList.remove("viewport-compact", "viewport-standard", "viewport-wide");
+      frame.classList.add(`viewport-${size}`);
+
+      ["compact", "standard", "wide"].forEach(s => {
+        const btn = document.getElementById("size" + s.charAt(0).toUpperCase() + s.slice(1));
+        btn.className = s === size
+          ? "px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-400 text-black"
+          : "px-1.5 py-0.5 text-[10px] font-bold rounded text-slate-400 hover:text-white";
+      });
+    }
+
+    function setCrtScale(scale) {
+      crtScale = scale;
+      document.documentElement.style.setProperty("--crt-scale", scale);
+      [0.9, 1.0, 1.15].forEach(sc => {
+        const id = "scale" + Math.round(sc * 100);
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.className = sc === scale
+          ? "px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-400 text-black"
+          : "px-1.5 py-0.5 text-[10px] font-bold rounded text-slate-400 hover:text-white";
+      });
+    }
+
+    function renderAll() {
+      document.getElementById("headerShipBadge").textContent = ship.name.toUpperCase();
+      const dot = document.getElementById("globalAlertDot");
+      dot.className = ship.redAlert
+        ? "inline-block w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"
+        : "inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+
+      renderBuilder();
+      renderShipTerminal();
+      renderShopTerminal();
+      saveShipState();
+    }
+
+    // =========================================================================
+    // 1. SHIP BUILDER LOGIC
+    // =========================================================================
+    function loadPreset(presetKey) {
+      if (!SHIP_PRESETS[presetKey]) return;
+      ship = JSON.parse(JSON.stringify(SHIP_PRESETS[presetKey]));
+      selectedRoomId = ship.rooms[0]?.id || null;
+      renderAll();
+    }
+
+    function updateShipMeta(field, val) {
+      ship[field] = val;
+      renderAll();
+    }
+
+    function updateShipStat(field, val) {
+      ship[field] = val;
+      if (field === "hullMax" && ship.hullCurrent > val) ship.hullCurrent = val;
+      if (field === "fuelMax" && ship.fuelCurrent > val) ship.fuelCurrent = val;
+      renderAll();
+    }
+
+    function updateShipFinance(field, val) {
+      ship[field] = val;
+      renderAll();
+    }
+
+    function renderBuilder() {
+      document.getElementById("inpShipName").value = ship.name;
+      document.getElementById("inpShipClass").value = ship.shipClass;
+      document.getElementById("inpTransponder").value = ship.transponder;
+      document.getElementById("inpHullCurrent").value = ship.hullCurrent;
+      document.getElementById("inpHullMax").value = ship.hullMax;
+      document.getElementById("inpArmor").value = ship.armor;
+      document.getElementById("inpThrusters").value = ship.thrusters;
+      document.getElementById("inpJumpDrive").value = ship.jumpRating;
+      document.getElementById("inpFuelCurrent").value = ship.fuelCurrent;
+      document.getElementById("inpFuelMax").value = ship.fuelMax;
+      document.getElementById("inpCrewCurrent").value = ship.crewCurrent;
+      document.getElementById("inpCrewMax").value = ship.crewMax;
+
+      document.getElementById("inpCredits").value = ship.credits;
+      document.getElementById("inpUpkeep").value = ship.monthlyUpkeep;
+      document.getElementById("inpDebt").value = ship.totalDebt;
+      document.getElementById("inpPaymentDays").value = ship.daysUntilDue;
+
+      renderBuilderDeckGrid();
+      renderBuilderRoomInspector();
+      renderBuilderWeapons();
+      renderBuilderCargo();
+      renderBuilderLogs();
+    }
+
+    function renderBuilderDeckGrid() {
+      const grid = document.getElementById("builderDeckGrid");
+      grid.innerHTML = "";
+
+      ship.rooms.forEach(room => {
+        const isSelected = room.id === selectedRoomId;
+        const spanClass = room.span === 4 ? "col-span-4" : room.span === 2 ? "col-span-2" : "col-span-1";
+        const statusColor =
+          room.status === "ONLINE" ? "text-emerald-400" :
+          room.status === "DAMAGED" ? "text-amber-400" : "text-red-400";
+
+        const card = document.createElement("button");
+        card.className = `${spanClass} p-2 text-left bg-[#0c1118] border rounded flex flex-col justify-between transition ${
+          isSelected
+            ? "border-cyan-400 shadow-[0_0_10px_rgba(0,229,255,0.3)]"
+            : "border-slate-700 hover:border-amber-400"
+        }`;
+        card.onclick = () => {
+          selectedRoomId = room.id;
+          renderBuilderDeckGrid();
+          renderBuilderRoomInspector();
+        };
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between text-[10px] font-bold">
+            <span class="text-cyan-400 uppercase truncate">${escapeHtml(room.type)}</span>
+            <span class="${statusColor}">${room.status}</span>
+          </div>
+          <div class="text-xs font-bold text-slate-100 truncate">${escapeHtml(room.name)}</div>
+          <div class="text-[9px] text-slate-400 truncate">${escapeHtml(room.notes || '')}</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function renderBuilderRoomInspector() {
+      const box = document.getElementById("builderRoomInspector");
+      const room = ship.rooms.find(r => r.id === selectedRoomId);
+      if (!room) {
+        box.innerHTML = `<div class="text-slate-500">Select a compartment on the grid above to edit or resize it.</div>`;
+        return;
+      }
+
+      box.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-cyan-300 uppercase">EDITING: ${escapeHtml(room.name)}</span>
+          <button onclick="deleteDeckRoom('${room.id}')" class="text-red-400 hover:underline font-bold text-[11px]">[ REMOVE ]</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label class="block text-[10px] text-slate-400">Custom Label</label>
+            <input type="text" value="${escapeHtml(room.name)}" onchange="updateRoomField('${room.id}', 'name', this.value)" class="w-full" />
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">Grid Size (Width)</label>
+            <select onchange="updateRoomField('${room.id}', 'span', parseInt(this.value))" class="w-full">
+              <option value="1" ${room.span === 1 ? 'selected' : ''}>1x1 Compact</option>
+              <option value="2" ${room.span === 2 ? 'selected' : ''}>2x1 Standard</option>
+              <option value="4" ${room.span === 4 ? 'selected' : ''}>4x1 Full Deck</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-400">System State</label>
+            <select onchange="updateRoomField('${room.id}', 'status', this.value)" class="w-full">
+              <option value="ONLINE" ${room.status === 'ONLINE' ? 'selected' : ''}>ONLINE</option>
+              <option value="DAMAGED" ${room.status === 'DAMAGED' ? 'selected' : ''}>DAMAGED</option>
+              <option value="OFFLINE" ${room.status === 'OFFLINE' ? 'selected' : ''}>OFFLINE</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] text-slate-400">Compartment Equipment & Notes</label>
+          <input type="text" value="${escapeHtml(room.notes || '')}" onchange="updateRoomField('${room.id}', 'notes', this.value)" class="w-full" />
+        </div>
+      `;
+    }
+
+    function addDeckRoom() {
+      const type = document.getElementById("newRoomTypeSelect").value;
+      const newRoom = {
+        id: "r_" + crypto.randomUUID(),
+        type,
+        name: type,
+        status: "ONLINE",
+        span: 2,
+        notes: "Standard deck module."
+      };
+      ship.rooms.push(newRoom);
+      selectedRoomId = newRoom.id;
+      renderAll();
+    }
+
+    function updateRoomField(id, field, val) {
+      const r = ship.rooms.find(rm => rm.id === id);
+      if (!r) return;
+      r[field] = val;
+      renderAll();
+    }
+
+    function deleteDeckRoom(id) {
+      ship.rooms = ship.rooms.filter(r => r.id !== id);
+      selectedRoomId = ship.rooms[0]?.id || null;
+      renderAll();
+    }
+
+    function renderBuilderWeapons() {
+      const list = document.getElementById("builderWeaponsList");
+      if (ship.weapons.length === 0) {
+        list.innerHTML = `<div class="text-xs text-slate-500 italic">No megadamage hardpoints mounted.</div>`;
+        return;
+      }
+      list.innerHTML = ship.weapons.map((w, idx) => `
+        <div class="p-2 bg-black/60 border border-slate-800 rounded space-y-1 text-xs">
+          <div class="flex gap-1">
+            <input type="text" value="${escapeHtml(w.name)}" onchange="updateWeapon(${idx}, 'name', this.value)" class="flex-1 font-bold text-red-300" />
+            <button onclick="removeWeapon(${idx})" class="text-red-400 px-1.5 font-bold">✕</button>
+          </div>
+          <div class="grid grid-cols-3 gap-1 text-[10px]">
+            <input type="text" value="${escapeHtml(w.damage)}" onchange="updateWeapon(${idx}, 'damage', this.value)" placeholder="2d10 MDMG" />
+            <input type="text" value="${escapeHtml(w.range)}" onchange="updateWeapon(${idx}, 'range', this.value)" placeholder="Range" />
+            <select onchange="updateWeapon(${idx}, 'status', this.value)">
+              <option value="ONLINE" ${w.status === 'ONLINE' ? 'selected' : ''}>ONLINE</option>
+              <option value="DAMAGED" ${w.status === 'DAMAGED' ? 'selected' : ''}>DAMAGED</option>
+              <option value="OFFLINE" ${w.status === 'OFFLINE' ? 'selected' : ''}>OFFLINE</option>
+            </select>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function addWeaponMount() {
+      ship.weapons.push({ id: "w_" + crypto.randomUUID(), name: "Pulse Laser Turret", damage: "2d10 MDMG", range: "Medium", status: "ONLINE" });
+      renderAll();
+    }
+
+    function updateWeapon(idx, field, val) {
+      if (!ship.weapons[idx]) return;
+      ship.weapons[idx][field] = val;
+      renderAll();
+    }
+
+    function removeWeapon(idx) {
+      ship.weapons.splice(idx, 1);
+      renderAll();
+    }
+
+    function renderBuilderCargo() {
+      const list = document.getElementById("builderCargoList");
+      if (ship.cargo.length === 0) {
+        list.innerHTML = `<div class="text-slate-500 italic">Cargo hold empty.</div>`;
+        return;
+      }
+      list.innerHTML = ship.cargo.map((item, idx) => `
+        <div class="flex items-center justify-between gap-1 bg-black/50 border border-slate-800 px-2 py-1 rounded">
+          <span class="truncate text-slate-200">${escapeHtml(item)}</span>
+          <button onclick="removeCargoItem(${idx})" class="text-red-400 font-bold text-[11px]">✕</button>
+        </div>
+      `).join("");
+    }
+
+    function addCustomCargoItem() {
+      ship.cargo.push("Emergency Salvage Crate");
+      renderAll();
+    }
+
+    function removeCargoItem(idx) {
+      ship.cargo.splice(idx, 1);
+      renderAll();
+    }
+
+    function renderBuilderLogs() {
+      const list = document.getElementById("builderLogsList");
+      if (ship.logs.length === 0) {
+        list.innerHTML = `<div class="text-slate-500 italic">No ship log entries recorded.</div>`;
+        return;
+      }
+      list.innerHTML = ship.logs.map((log, idx) => `
+        <div class="p-2 bg-black/60 border border-slate-800 rounded space-y-1">
+          <div class="flex gap-1">
+            <input type="text" value="${escapeHtml(log.title)}" onchange="updateLog(${idx}, 'title', this.value)" class="flex-1 font-bold text-cyan-300 text-[11px]" />
+            <button onclick="removeLog(${idx})" class="text-red-400 font-bold px-1">✕</button>
+          </div>
+          <textarea rows="2" onchange="updateLog(${idx}, 'body', this.value)" class="w-full text-[11px]">${escapeHtml(log.body)}</textarea>
+        </div>
+      `).join("");
+    }
+
+    function addShipLog() {
+      ship.logs.unshift({
+        id: "l_" + crypto.randomUUID(),
+        title: "LOG // NEW ENTRY",
+        date: "2194.11.22",
+        body: "Enter mission log or sensor telemetry..."
+      });
+      renderAll();
+    }
+
+    function updateLog(idx, field, val) {
+      if (!ship.logs[idx]) return;
+      ship.logs[idx][field] = val;
+      renderAll();
+    }
+
+    function removeLog(idx) {
+      ship.logs.splice(idx, 1);
+      renderAll();
+    }
+
+    // =========================================================================
+    // 2. SHIP TERMINAL (INTERACTIVE PLAYER OS)
+    // =========================================================================
+    function renderShipTerminal() {
+      const banner = document.getElementById("shipTerminalBanner");
+      banner.classList.toggle("red-alert-active", !!ship.redAlert);
+
+      document.getElementById("termShipTitle").textContent = `USCSS ${ship.name.toUpperCase()} // ONBOARD OS`;
+      document.getElementById("termShipMeta").textContent = `CLASS: ${ship.shipClass.toUpperCase()} • TRANSPONDER: ${ship.transponder.toUpperCase()} • JUMP-${ship.jumpRating} RATED`;
+
+      // Vitals
+      document.getElementById("termArmorBadge").textContent = `ARMOR: ${ship.armor} AP`;
+      document.getElementById("termHullText").textContent = `${ship.hullCurrent} / ${ship.hullMax} HP`;
+      const hullPct = Math.max(0, Math.min(100, Math.round((ship.hullCurrent / Math.max(1, ship.hullMax)) * 100)));
+      const hullBar = document.getElementById("termHullBar");
+      hullBar.style.width = `${hullPct}%`;
+      hullBar.className = `h-full transition-all ${hullPct <= 30 ? 'bg-red-500' : hullPct <= 60 ? 'bg-amber-400' : 'bg-emerald-500'}`;
+
+      document.getElementById("termThrusterBadge").textContent = `THRUST: ${ship.thrusters}`;
+      document.getElementById("termFuelText").textContent = `${ship.fuelCurrent} / ${ship.fuelMax} CELLS`;
+      const fuelPct = Math.max(0, Math.min(100, Math.round((ship.fuelCurrent / Math.max(1, ship.fuelMax)) * 100)));
+      document.getElementById("termFuelBar").style.width = `${fuelPct}%`;
+
+      document.getElementById("termCrewText").textContent = `${ship.crewCurrent} / ${ship.crewMax} CREW`;
+      document.getElementById("termDueBadge").textContent = `DUE: ${ship.daysUntilDue}D`;
+      document.getElementById("termCreditsText").textContent = `${ship.credits.toLocaleString()} cr`;
+      document.getElementById("termDebtText").textContent = `Debt: ${ship.totalDebt.toLocaleString()} cr (${ship.monthlyUpkeep.toLocaleString()}/mo)`;
+
+      // Interactive Deck Schematic
+      const deckGrid = document.getElementById("terminalDeckGrid");
+      deckGrid.innerHTML = "";
+      ship.rooms.forEach(room => {
+        const spanClass = room.span === 4 ? "col-span-4" : room.span === 2 ? "col-span-2" : "col-span-1";
+        const styleClass =
+          room.status === "ONLINE"
+            ? "border-emerald-500/60 bg-emerald-950/20 text-emerald-200 hover:border-emerald-400"
+            : room.status === "DAMAGED"
+            ? "border-amber-500 bg-amber-950/35 text-amber-200 hover:border-amber-300"
+            : "border-red-600 bg-red-950/45 text-red-200 hover:border-red-400";
+
+        const badge =
+          room.status === "ONLINE" ? "● ONLINE" :
+          room.status === "DAMAGED" ? "▲ DAMAGED" : "✕ OFFLINE";
+
+        const btn = document.createElement("button");
+        btn.className = `${spanClass} p-2.5 border rounded text-left flex flex-col justify-between transition cursor-pointer ${styleClass}`;
+        btn.onclick = () => cycleRoomStatus(room.id);
+        btn.innerHTML = `
+          <div class="flex items-center justify-between text-[10px] font-bold">
+            <span class="uppercase opacity-80">${escapeHtml(room.type)}</span>
+            <span>${badge}</span>
+          </div>
+          <div class="text-xs font-bold truncate">${escapeHtml(room.name)}</div>
+          <div class="text-[10px] opacity-75 truncate">${escapeHtml(room.notes || '')}</div>
+        `;
+        deckGrid.appendChild(btn);
+      });
+
+      // Weapons List
+      const weapBox = document.getElementById("terminalWeaponsList");
+      if (ship.weapons.length === 0) {
+        weapBox.innerHTML = `<div class="text-xs text-slate-500 italic col-span-2">No offensive hardpoints installed on this vessel.</div>`;
+      } else {
+        weapBox.innerHTML = ship.weapons.map(w => `
+          <button onclick="cycleWeaponStatus('${w.id}')" class="p-2.5 border rounded text-left flex items-center justify-between transition ${
+            w.status === 'ONLINE' ? 'border-red-500/50 bg-red-950/20 text-red-200' : 'border-slate-700 bg-black/60 text-slate-400'
+          }">
+            <div>
+              <div class="text-xs font-bold">${escapeHtml(w.name)}</div>
+              <div class="text-[10px] text-amber-400">${escapeHtml(w.damage)} • RANGE: ${escapeHtml(w.range)}</div>
+            </div>
+            <span class="text-[10px] font-bold px-1.5 py-0.5 border border-current">${w.status}</span>
+          </button>
+        `).join("");
+      }
+
+      // Jump Plotter
+      document.getElementById("termJumpRatingBadge").textContent = `MAX: JUMP-${ship.jumpRating}`;
+      updateJumpCalc();
+
+      // Ship Logs
+      const logsBox = document.getElementById("terminalLogsList");
+      logsBox.innerHTML = ship.logs.map(log => `
+        <div class="p-2.5 bg-black/60 border border-slate-800 rounded space-y-1">
+          <div class="flex justify-between text-[10px] text-amber-400 font-bold">
+            <span>${escapeHtml(log.title)}</span>
+            <span>${escapeHtml(log.date || '')}</span>
+          </div>
+          <p class="text-xs text-slate-300 leading-relaxed whitespace-pre-line">${escapeHtml(log.body)}</p>
+        </div>
+      `).join("") || `<div class="text-xs text-slate-500 italic">No mission logs stored.</div>`;
+
+      // Cargo Manifest
+      const cargoBox = document.getElementById("terminalCargoManifest");
+      cargoBox.innerHTML = ship.cargo.map(item => `
+        <span class="px-2 py-1 bg-black/70 border border-emerald-500/30 text-emerald-300 rounded text-[11px]">
+          ${escapeHtml(item)}
+        </span>
+      `).join("") || `<span class="text-slate-500 italic">Hold is empty.</span>`;
+    }
+
+    function cycleRoomStatus(roomId) {
+      const room = ship.rooms.find(r => r.id === roomId);
+      if (!room) return;
+      const order = ["ONLINE", "DAMAGED", "OFFLINE"];
+      room.status = order[(order.indexOf(room.status) + 1) % order.length];
+      renderAll();
+    }
+
+    function cycleWeaponStatus(wId) {
+      const w = ship.weapons.find(wp => wp.id === wId);
+      if (!w) return;
+      const order = ["ONLINE", "DAMAGED", "OFFLINE"];
+      w.status = order[(order.indexOf(w.status) + 1) % order.length];
+      renderAll();
+    }
+
+    function toggleRedAlert() {
+      ship.redAlert = !ship.redAlert;
+      if (ship.redAlert) {
+        showTermAlert("RED ALERT ENGAGED: ALL HANDS TO BATTLE STATIONS • BULKHEADS SEALED");
+      } else {
+        dismissTermAlert();
+      }
+      renderAll();
+    }
+
+    function triggerDistressBeacon() {
+      showTermAlert(`DISTRESS BEACON BROADCASTING ON ALL SUB-SPACE BANDS // TRANSPONDER: ${ship.transponder.toUpperCase()}`);
+    }
+
+    function showTermAlert(msg) {
+      document.getElementById("termAlertText").textContent = msg;
+      document.getElementById("termAlertBar").classList.remove("hidden");
+    }
+
+    function dismissTermAlert() {
+      document.getElementById("termAlertBar").classList.add("hidden");
+    }
+
+    function updateJumpCalc() {
+      const dist = parseInt(document.getElementById("jumpDistSelect").value) || 1;
+      const readout = document.getElementById("jumpCalcReadout");
+      const btn = document.getElementById("btnExecuteJump");
+      const engineRoom = ship.rooms.find(r => r.type === "Engine Room");
+      const engineOk = !engineRoom || engineRoom.status !== "OFFLINE";
+
+      const withinRating = dist <= ship.jumpRating;
+      const hasFuel = ship.fuelCurrent >= dist;
+
+      if (!engineOk) {
+        readout.innerHTML = `<span class="text-red-400 font-bold">✕ JUMP DRIVE OFFLINE:</span> Repair Engine Room compartment before plotting jump.`;
+        btn.disabled = true;
+      } else if (!withinRating) {
+        readout.innerHTML = `<span class="text-red-400 font-bold">✕ EXCEEDS DRIVE RATING:</span> Vessel is Jump-${ship.jumpRating} rated (Requested: ${dist} Parsecs).`;
+        btn.disabled = true;
+      } else if (!hasFuel) {
+        readout.innerHTML = `<span class="text-amber-400 font-bold">⚠ INSUFFICIENT FUEL:</span> Requires ${dist} Fuel Cells (Available: ${ship.fuelCurrent}).`;
+        btn.disabled = true;
+      } else {
+        readout.innerHTML = `
+          <div class="text-emerald-400 font-bold">✓ SOLUTION VALIDATED</div>
+          <div class="text-slate-300">Fuel Burn: <span class="text-amber-300 font-bold">${dist} Cell(s)</span> • Post-Jump Reserve: <span class="text-cyan-300">${ship.fuelCurrent - dist} Cell(s)</span></div>
+        `;
+        btn.disabled = false;
+      }
+    }
+
+    function executeJumpPlot() {
+      const dist = parseInt(document.getElementById("jumpDistSelect").value) || 1;
+      const dest = document.getElementById("jumpDestInput").value.trim() || "UNKNOWN SECTOR";
+      if (ship.fuelCurrent < dist || dist > ship.jumpRating) return;
+
+      ship.fuelCurrent -= dist;
+      ship.logs.unshift({
+        id: "l_" + crypto.randomUUID(),
+        title: `JUMP // ${dest.toUpperCase()}`,
+        date: "2194.11.22",
+        body: `Executed ${dist}-Parsec sub-space jump to ${dest}. Consumed ${dist} reaction fuel cell(s).`
+      });
+      showTermAlert(`JUMP COMPLETE: EMERGED IN ${dest.toUpperCase()} (-${dist} FUEL CELLS)`);
+      renderAll();
+    }
+
+    // =========================================================================
+    // 3. STATION SHOP TERMINAL LOGIC
+    // =========================================================================
+    function setShopTier(tier) {
+      shopTier = tier;
+      document.getElementById("shopTierDesc").textContent = TIER_CONFIG[tier].desc;
+      // Clear cart when switching station tier so prices stay accurate
+      shopCart = [];
+      renderShopTerminal();
+    }
+
+    function setShopCategory(cat) {
+      shopCategory = cat;
+      renderShopTerminal();
+    }
+
+    function getScaledPrice(basePrice) {
+      const mult = TIER_CONFIG[shopTier].mult;
+      return Math.round((basePrice * mult) / 50) * 50;
+    }
+
+    function renderShopTerminal() {
+      document.getElementById("shopCreditsDisplay").textContent = `${ship.credits.toLocaleString()} cr`;
+
+      // Category Tab Styling
+      const cats = {
+        ship: document.getElementById("shopCatShip"),
+        gear: document.getElementById("shopCatGear"),
+        drydock: document.getElementById("shopCatDrydock")
+      };
+      Object.entries(cats).forEach(([key, el]) => {
+        if (key === shopCategory) {
+          el.className = "px-3 py-1.5 text-xs font-bold border border-amber-400 bg-amber-400 text-black rounded transition";
+        } else {
+          el.className = "px-3 py-1.5 text-xs font-bold border border-slate-700 bg-[#0e1217] text-slate-300 hover:border-amber-400 rounded transition";
+        }
+      });
+
+      // Render Filtered Catalog
+      const currentTierLevel = TIER_CONFIG[shopTier].level;
+      const items = SHOP_CATALOG.filter(i => i.category === shopCategory);
+      const grid = document.getElementById("shopCatalogGrid");
+
+      grid.innerHTML = items.map(item => {
+        const available = currentTierLevel >= item.minTier;
+        const price = getScaledPrice(item.basePrice);
+
+        return `
+          <div class="panel-box p-3 flex flex-col justify-between space-y-2.5 ${available ? 'border-slate-700' : 'border-red-900/40 opacity-55'}">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[10px] font-bold">
+                <span class="text-cyan-400">${item.tag}</span>
+                <span class="text-amber-400">${price.toLocaleString()} cr</span>
+              </div>
+              <div class="text-sm font-bold text-white">${escapeHtml(item.name)}</div>
+              <p class="text-[11px] text-slate-400 leading-relaxed">${escapeHtml(item.desc)}</p>
+            </div>
+            <div class="pt-1">
+              ${available
+                ? `<button onclick="addToShopCart('${item.id}')" class="btn-amber w-full py-1.5 text-xs font-bold">+ ADD TO REQUISITION</button>`
+                : `<div class="text-center py-1.5 text-[10px] font-bold text-red-400 border border-red-900/60 bg-red-950/20">UNAVAILABLE AT TIER ${currentTierLevel} PORT</div>`
+              }
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      renderShopCart();
+    }
+
+    function addToShopCart(itemId) {
+      const item = SHOP_CATALOG.find(i => i.id === itemId);
+      if (!item) return;
+      shopCart.push({
+        cartUid: "c_" + Date.now() + "_" + Math.random(),
+        itemId: item.id,
+        name: item.name,
+        price: getScaledPrice(item.basePrice)
+      });
+      renderShopCart();
+    }
+
+    function removeFromShopCart(uid) {
+      shopCart = shopCart.filter(c => c.cartUid !== uid);
+      renderShopCart();
+    }
+
+    function clearShopCart() {
+      shopCart = [];
+      renderShopCart();
+    }
+
+    function renderShopCart() {
+      const list = document.getElementById("shopCartList");
+      const subtotal = shopCart.reduce((acc, c) => acc + c.price, 0);
+      const remaining = ship.credits - subtotal;
+
+      document.getElementById("cartSubtotalText").textContent = `${subtotal.toLocaleString()} cr`;
+      const remEl = document.getElementById("cartRemainingText");
+      remEl.textContent = `${remaining.toLocaleString()} cr`;
+      remEl.className = remaining < 0 ? "font-bold text-red-400" : "font-bold text-emerald-400";
+
+      const btnCash = document.getElementById("btnCheckoutCash");
+      const btnDebt = document.getElementById("btnCheckoutDebt");
+      btnCash.disabled = shopCart.length === 0 || remaining < 0;
+      btnDebt.disabled = shopCart.length === 0;
+
+      if (shopCart.length === 0) {
+        list.innerHTML = `<div class="text-slate-500 italic">Cart is empty. Select upgrades, gear, or drydock services.</div>`;
+        return;
+      }
+
+      list.innerHTML = shopCart.map(c => `
+        <div class="flex items-center justify-between gap-2 p-2 bg-black/60 border border-slate-800 rounded">
+          <div class="truncate">
+            <div class="font-bold text-slate-200 truncate">${escapeHtml(c.name)}</div>
+            <div class="text-[10px] text-amber-400">${c.price.toLocaleString()} cr</div>
+          </div>
+          <button onclick="removeFromShopCart('${c.cartUid}')" class="text-red-400 font-bold px-1.5">✕</button>
+        </div>
+      `).join("");
+    }
+
+    function checkoutShop(paymentMethod) {
+      if (shopCart.length === 0) return;
+      const subtotal = shopCart.reduce((acc, c) => acc + c.price, 0);
+
+      if (paymentMethod === "cash" && ship.credits < subtotal) return;
+
+      const purchasedNames = [];
+      shopCart.forEach(entry => {
+        const catalogItem = SHOP_CATALOG.find(i => i.id === entry.itemId);
+        if (catalogItem && catalogItem.applyEffect) {
+          catalogItem.applyEffect(ship);
+          purchasedNames.push(`• ${catalogItem.name} (${entry.price.toLocaleString()} cr)`);
+        }
+      });
+
+      let paymentSummary = "";
+      if (paymentMethod === "cash") {
+        ship.credits -= subtotal;
+        paymentSummary = `PAID IN FULL: -${subtotal.toLocaleString()} cr\nNEW BALANCE: ${ship.credits.toLocaleString()} cr`;
+      } else {
+        const financedTotal = Math.round(subtotal * 1.1);
+        ship.totalDebt += financedTotal;
+        paymentSummary = `FINANCED ON MORTGAGE (+10% FEE): +${financedTotal.toLocaleString()} cr\nNEW TOTAL DEBT: ${ship.totalDebt.toLocaleString()} cr`;
+      }
+
+      // Log transaction onto Ship's Log
+      ship.logs.unshift({
+        id: "l_" + crypto.randomUUID(),
+        title: `REQUISITION // PORT AUTHORITY`,
+        date: "2194.11.22",
+        body: `Port transaction completed (${shopTier.toUpperCase()} TIER):\n${purchasedNames.join("\n")}\n${paymentSummary}`
+      });
+
+      // Show Receipt
+      const receiptBox = document.getElementById("shopReceiptBox");
+      document.getElementById("receiptTimestamp").textContent = new Date().toLocaleTimeString();
+      document.getElementById("receiptBody").textContent =
+        `VESSEL: ${ship.name.toUpperCase()} (${ship.transponder})\n` +
+        `----------------------------------------\n` +
+        `${purchasedNames.join("\n")}\n` +
+        `----------------------------------------\n` +
+        `${paymentSummary}\n` +
+        `STATUS: UPDATED IN THIS TAB (SEE SAVE STATUS ABOVE)`;
+      receiptBox.classList.remove("hidden");
+
+      shopCart = [];
+      renderAll();
+    }
+
+    // =========================================================================
+    // JSON EXPORT / IMPORT & HELPERS
+    // =========================================================================
+    function exportShipJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ship, null, 2));
+      const a = document.createElement("a");
+      a.setAttribute("href", dataStr);
+      const slug = (ship.name || "vessel").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      a.setAttribute("download", `${slug}_mothership1e.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function importShipJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          BUILDER_VALIDATION.ship(parsed);
+          if (!projectStorage.confirmImport()) return;
+          ship = parsed;
+          selectedRoomId = ship.rooms[0]?.id || null;
+          renderAll();
+        } catch (err) { projectStorage.error("Import failed: " + err.message); }
+      };
+      reader.onerror = () => projectStorage.error("Import failed: could not read the file.");
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // Boot App
+    window.onload = () => {
+      setViewportSize("wide");
+      setCrtScale(1.0);
+      switchMode(new URLSearchParams(location.search).get("mode") === "shop" ? "shop" : "builder");
+    };
+  </script>
+</body>
+</html>

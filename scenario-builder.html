@@ -1,0 +1,2165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WARDEN//OS — Modular Scenario Builder & Player Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --bg-void: #090b0e;
+      --bg-panel: #0e1217;
+      --bg-elevated: #141a22;
+      --amber: #ffb000;
+      --amber-dim: rgba(255, 176, 0, 0.25);
+      --crimson: #ff3333;
+      --crimson-dim: rgba(255, 51, 51, 0.22);
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0, 229, 255, 0.2);
+      --emerald: #10b981;
+      --border-subtle: #222b36;
+    }
+
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: #2c3746 #090b0e;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--bg-void);
+      color: #d6dee8;
+      font-family: 'JetBrains Mono', monospace;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* CRT Scanlines & Subtle Vignette */
+    .crt-overlay {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.28) 50%
+      ), radial-gradient(circle at center, transparent 65%, rgba(0, 0, 0, 0.55) 100%);
+      background-size: 100% 3px, 100% 100%;
+    }
+
+    .font-display {
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: 0.06em;
+    }
+
+    .glow-amber { text-shadow: 0 0 8px rgba(255, 176, 0, 0.55); }
+    .glow-cyan { text-shadow: 0 0 8px rgba(0, 229, 255, 0.55); }
+    .glow-crimson { text-shadow: 0 0 10px rgba(255, 51, 51, 0.7); }
+
+    .panel-box {
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-crt {
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-elevated);
+      transition: all 0.14s ease;
+      cursor: pointer;
+    }
+    .btn-crt:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      box-shadow: 0 0 10px var(--amber-dim);
+    }
+
+    .btn-amber {
+      border: 1px solid var(--amber);
+      background: rgba(255, 176, 0, 0.12);
+      color: var(--amber);
+    }
+    .btn-amber:hover {
+      background: var(--amber);
+      color: #090b0e;
+      box-shadow: 0 0 14px var(--amber-dim);
+    }
+
+    .btn-cyan {
+      border: 1px solid var(--cyan);
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--cyan);
+    }
+    .btn-cyan:hover {
+      background: var(--cyan);
+      color: #090b0e;
+      box-shadow: 0 0 14px var(--cyan-dim);
+    }
+
+    .btn-crimson {
+      border: 1px solid var(--crimson);
+      background: rgba(255, 51, 51, 0.14);
+      color: var(--crimson);
+    }
+    .btn-crimson:hover {
+      background: var(--crimson);
+      color: #090b0e;
+      box-shadow: 0 0 16px var(--crimson-dim);
+    }
+
+    input, select, textarea {
+      background: #080a0d;
+      border: 1px solid #283342;
+      color: #e6edf5;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      padding: 0.4rem 0.55rem;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 6px var(--cyan-dim);
+    }
+
+    /* Glitch Animation for Live Injections */
+    @keyframes crtGlitch {
+      0% { transform: translate(0); filter: hue-rotate(0deg); }
+      20% { transform: translate(-4px, 2px); filter: hue-rotate(90deg) contrast(160%); }
+      40% { transform: translate(4px, -2px); filter: invert(0.15); }
+      60% { transform: translate(-2px, -1px); filter: hue-rotate(-90deg); }
+      80% { transform: translate(3px, 1px); }
+      100% { transform: translate(0); filter: none; }
+    }
+    .glitch-active {
+      animation: crtGlitch 0.35s cubic-bezier(.25, .46, .45, .94) both infinite;
+    }
+
+    @keyframes pulseBorder {
+      0%, 100% { border-color: rgba(255, 51, 51, 0.9); box-shadow: 0 0 14px rgba(255, 51, 51, 0.35); }
+      50% { border-color: rgba(255, 51, 51, 0.3); box-shadow: none; }
+    }
+    .pulse-crimson {
+      animation: pulseBorder 1.6s infinite;
+    }
+
+    /* Map Node Styling */
+    .map-canvas {
+      background-image: 
+        linear-gradient(to right, rgba(34, 43, 54, 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(34, 43, 54, 0.35) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    .node-card {
+      user-select: none;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.08s;
+    }
+    @media (max-width: 1023px) {
+      body { height: auto !important; min-height: 100vh; overflow-y: auto !important; }
+      #workspaceContainer { display: block; overflow: visible; }
+      #builderView:not(.hidden) { height: auto; overflow: visible; }
+      #builderView > section { height: auto; min-height: 300px; overflow: visible; }
+      #builderMapWrapper { height: 400px; flex: none; }
+      #inspectorContent { max-height: 70vh; }
+      #playerView:not(.hidden) { min-height: 75vh; }
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+  <div class="crt-overlay"></div>
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="panel-box border-b border-slate-800 px-3 py-2 flex flex-wrap items-center justify-between gap-2 z-30 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span class="font-display text-lg font-bold text-amber-400 glow-amber tracking-wider">WARDEN//OS</span>
+      </div>
+      <span class="text-slate-600 hidden sm:inline">|</span>
+      <input id="scenarioTitleInput" type="text" class="font-display text-sm sm:text-base font-bold text-cyan-300 bg-transparent border-transparent hover:border-slate-700 focus:border-cyan-400 px-2 py-0.5 w-56 sm:w-72" value="INCIDENT AT BEACON 3A-R3D" title="Edit Scenario Title" />
+    </div>
+
+    <!-- Mode Switcher -->
+    <div class="flex items-center bg-black/70 p-1 border border-slate-800 rounded">
+      <button id="btnModeBuilder" onclick="setMode('builder')" class="px-3 py-1 text-xs font-bold tracking-wider transition">
+        [ BUILDER MODE ]
+      </button>
+      <button id="btnModePlayer" onclick="setMode('player')" class="px-3 py-1 text-xs font-bold tracking-wider transition">
+        [ PLAYER TERMINAL PREVIEW ]
+      </button>
+      <button id="btnModeSplit" onclick="setMode('split')" class="hidden xl:inline-block px-3 py-1 text-xs font-bold tracking-wider transition">
+        [ SPLIT LIVE ]
+      </button>
+    </div>
+
+    <!-- JSON Import/Export & Reset -->
+    <div class="flex items-center gap-1.5 text-xs">
+      <button onclick="exportScenarioJSON()" class="btn-crt px-2.5 py-1.5 font-semibold" title="Export Scenario JSON">
+        EXPORT JSON
+      </button>
+      <label class="btn-crt px-2.5 py-1.5 font-semibold cursor-pointer" title="Import Scenario JSON">
+        IMPORT
+        <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importScenarioJSON(event)" />
+      </label>
+      <button onclick="openResetConfirm()" class="btn-crimson px-2.5 py-1.5 font-semibold" title="Reset to Default Beacon 3A-R3D">
+        RESET 3A-R3D
+      </button>
+    </div>
+  </header>
+
+  <div class="px-3 py-2 bg-amber-950 text-xs text-amber-200 shrink-0">
+    <a class="underline mr-3" href="index.html">MAIN GATEWAY</a>
+    <a class="underline mr-3" href="builders.html">BUILDERS</a>
+    LOCAL PROTOTYPE: saved in this browser only. Export JSON for backup; not connected to Beacon online sessions.
+  </div>
+  <div id="builder-storage-status" role="alert" hidden class="px-3 py-2 bg-red-950 text-red-200 text-sm shrink-0"></div>
+  <!-- MAIN WORKSPACE -->
+  <main id="workspaceContainer" class="flex-1 flex overflow-hidden relative">
+
+    <!-- ==================== BUILDER MODE VIEW ==================== -->
+    <div id="builderView" class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden h-full">
+
+      <!-- 1. LEFT PANEL: INTERACTIVE NODE MAP & GLOBAL CLOCKS -->
+      <section class="lg:col-span-5 flex flex-col border-r border-slate-800 overflow-hidden h-full bg-[#0b0e12]">
+        <div class="px-3 py-2 border-b border-slate-800 flex items-center justify-between bg-[#0e1217] shrink-0">
+          <div>
+            <h2 class="font-display text-xs font-bold text-amber-400 tracking-wider">01 // DECK & NODE TOPOLOGY</h2>
+            <p class="text-[10px] text-slate-400">Drag nodes to position • Click to inspect</p>
+          </div>
+          <button onclick="addNewNode()" class="btn-amber px-2.5 py-1 text-xs font-bold">
+            + ADD ROOM / LEVEL
+          </button>
+        </div>
+
+        <!-- Interactive Visual Map Canvas -->
+        <div id="builderMapWrapper" class="relative flex-1 overflow-auto map-canvas min-h-[300px]">
+          <div id="builderMapCanvas" class="relative w-[680px] h-[740px]">
+            <svg id="builderConnectionsSvg" class="absolute inset-0 w-full h-full pointer-events-none"></svg>
+            <div id="builderNodesLayer" class="absolute inset-0"></div>
+          </div>
+        </div>
+
+        <!-- Global Clocks & Threat Escalation Manager -->
+        <div class="border-t border-slate-800 p-3 bg-[#0e1217] shrink-0 max-h-56 overflow-y-auto">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-display text-xs font-bold text-cyan-400">GLOBAL CLOCKS & ESCALATION</span>
+            <button onclick="addGlobalClock()" class="text-[11px] text-cyan-400 hover:underline">+ Add Clock</button>
+          </div>
+          <div id="builderClocksList" class="space-y-2"></div>
+        </div>
+      </section>
+
+      <!-- 2. CENTER PANEL: ROOM & TERMINAL INSPECTOR -->
+      <section class="lg:col-span-4 flex flex-col border-r border-slate-800 overflow-hidden h-full bg-[#0e1217]">
+        <div class="px-3 py-2 border-b border-slate-800 flex items-center justify-between shrink-0">
+          <h2 class="font-display text-xs font-bold text-cyan-400 tracking-wider">02 // ROOM & TERMINAL INSPECTOR</h2>
+          <button id="btnDeleteSelectedNode" onclick="deleteSelectedNode()" class="text-[11px] text-red-400 hover:text-red-300 font-semibold">
+            [ DELETE ROOM ]
+          </button>
+        </div>
+
+        <div id="inspectorContent" class="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </section>
+
+      <!-- 3. RIGHT PANEL: LIVE WARDEN CONTROLLER & EVENT TRIGGERS -->
+      <section class="lg:col-span-3 flex flex-col overflow-hidden h-full bg-[#0b0e12]">
+        <div class="px-3 py-2 border-b border-slate-800 flex items-center justify-between bg-[#0e1217] shrink-0">
+          <h2 class="font-display text-xs font-bold text-red-400 tracking-wider">03 // LIVE WARDEN CONTROLLER</h2>
+          <span class="text-[10px] px-1.5 py-0.5 bg-red-950/70 border border-red-700 text-red-300">LIVE SYNC</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
+          <!-- Party Location & Stress -->
+          <div class="panel-box p-2.5 space-y-2">
+            <div class="font-display text-[11px] font-bold text-amber-400 uppercase">Crew Telemetry</div>
+            <div class="flex items-center justify-between gap-2">
+              <label class="text-slate-400">Active Room:</label>
+              <select id="wardenPartyNodeSelect" onchange="movePartyDirect(this.value)" class="flex-1"></select>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-400">Party Stress Level:</span>
+              <div class="flex items-center gap-1.5">
+                <button onclick="adjustStress(-1)" class="btn-crt px-2 py-0.5 font-bold">-</button>
+                <span id="wardenStressDisplay" class="font-bold text-amber-400 w-6 text-center">2</span>
+                <button onclick="adjustStress(1)" class="btn-crt px-2 py-0.5 font-bold">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Global Station State Toggles -->
+          <div class="panel-box p-2.5 space-y-2">
+            <div class="font-display text-[11px] font-bold text-cyan-400 uppercase">Station World-State Flags</div>
+            <label class="flex items-center justify-between cursor-pointer py-1 border-b border-slate-800/70">
+              <span>ZPM Installed in 07</span>
+              <input type="checkbox" id="flagZpmInstalled" onchange="toggleWorldFlag('zpmInstalled', this.checked)" class="accent-amber-500 w-4 h-4" />
+            </label>
+            <label class="flex items-center justify-between cursor-pointer py-1 border-b border-slate-800/70">
+              <span>07B Mainframe Unsealed</span>
+              <input type="checkbox" id="flagCoreUnlocked" onchange="toggleWorldFlag('coreUnlocked', this.checked)" class="accent-cyan-400 w-4 h-4" />
+            </label>
+            <label class="flex items-center justify-between cursor-pointer py-1 border-b border-slate-800/70">
+              <span>Virus Awakening (Workers On)</span>
+              <input type="checkbox" id="flagVirusAwakened" onchange="toggleWorldFlag('virusAwakened', this.checked)" class="accent-amber-500 w-4 h-4" />
+            </label>
+            <label class="flex items-center justify-between cursor-pointer py-1">
+              <span class="text-red-400 font-semibold">Containment Lockdown</span>
+              <input type="checkbox" id="flagLockdown" onchange="toggleWorldFlag('lockdown', this.checked)" class="accent-red-500 w-4 h-4" />
+            </label>
+          </div>
+
+          <!-- Reaper & Threat Tracker -->
+          <div class="panel-box p-2.5 space-y-2.5 border-red-900/50">
+            <div class="font-display text-[11px] font-bold text-red-400 uppercase flex items-center justify-between">
+              <span>Reaper Threat Matrix</span>
+              <span class="text-[10px] text-slate-400">VIRUS PROTOCOL</span>
+            </div>
+            <div class="space-y-1">
+              <label class="text-[11px] text-slate-400 block">1 Active Hunter Reaper Location:</label>
+              <select id="wardenHunterNodeSelect" onchange="moveHunterReaper(this.value)" class="w-full border-red-900/70 text-red-300"></select>
+            </div>
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-[11px] text-slate-300">Station Worker Reapers:</span>
+              <button id="btnToggleWorkerStatus" onclick="toggleWorkerReapersState()" class="px-2 py-1 text-[11px] font-bold border"></button>
+            </div>
+            <button onclick="triggerHunterAmbush()" class="btn-crimson w-full py-1.5 font-bold text-[11px]">
+              TRIGGER HUNTER AMBUSH ALERT
+            </button>
+          </div>
+
+          <!-- Live Terminal Injection -->
+          <div class="panel-box p-2.5 space-y-2">
+            <div class="font-display text-[11px] font-bold text-amber-400 uppercase">Live Terminal Injection</div>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button onclick="injectTerminalEffect('glitch')" class="btn-crt py-1.5 text-[11px] font-semibold">
+                CRT GLITCH
+              </button>
+              <button onclick="injectTerminalEffect('audio')" class="btn-crt py-1.5 text-[11px] font-semibold">
+                VENT CLAWS CUE
+              </button>
+              <button onclick="injectTerminalEffect('broadcast')" class="btn-amber py-1.5 text-[11px] font-semibold col-span-2">
+                PUSH MIND-CORE SIGNAL PULSE
+              </button>
+            </div>
+            <div class="pt-1 flex gap-1">
+              <input id="customBroadcastInput" type="text" placeholder="Custom system alert text..." class="flex-1 text-[11px]" />
+              <button onclick="sendCustomAlert()" class="btn-cyan px-2 py-1 font-bold text-[11px]">SEND</button>
+            </div>
+          </div>
+
+          <!-- Level 10 Ultimatum Trigger -->
+          <div class="panel-box p-2.5 border-red-600/70 bg-red-950/20 space-y-2">
+            <div class="font-display text-[11px] font-bold text-red-400 uppercase">Climax Override (Level 10)</div>
+            <p class="text-[10px] text-slate-400">Forces the unskippable Escape vs. Self-Destruct modal onto the Player Terminal.</p>
+            <button onclick="forceLevel10Ultimatum()" class="btn-crimson w-full py-2 font-bold tracking-wider">
+              PUSH LEVEL 10 ULTIMATUM
+            </button>
+          </div>
+
+          <!-- Warden Event Log -->
+          <div class="panel-box p-2.5 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-display text-[11px] font-bold text-slate-400">WARDEN TELEMETRY LOG</span>
+              <button onclick="clearWardenLog()" class="text-[10px] text-slate-500 hover:text-slate-300">Clear</button>
+            </div>
+            <div id="wardenLogFeed" class="h-32 overflow-y-auto space-y-1 text-[10px] font-mono text-slate-300 bg-black/60 p-2 border border-slate-800"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== PLAYER TERMINAL PREVIEW VIEW ==================== -->
+    <div id="playerView" class="hidden flex-1 flex flex-col bg-[#07090c] text-amber-400 overflow-hidden h-full relative">
+
+      <!-- Player Top Status Bar -->
+      <div class="border-b border-amber-500/30 bg-[#0c1015] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-3">
+          <span class="px-2 py-0.5 bg-amber-500/20 border border-amber-400 text-amber-300 text-xs font-bold">
+            UPLINK: ACTIVE
+          </span>
+          <div>
+            <div id="playerStationHeader" class="font-display text-sm sm:text-base font-bold text-amber-400 glow-amber">
+              BEACON 3A-R3D // CREW INTERFACE
+            </div>
+            <div id="playerLocationSubtitle" class="text-[11px] text-cyan-400">
+              CURRENT NODE: [01] DROPSHIP LANDING RIG
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Clocks HUD on Player Screen -->
+        <div id="playerClocksHud" class="flex flex-wrap items-center gap-3"></div>
+
+        <!-- Crew Stress & Audio Status -->
+        <div class="flex items-center gap-3 text-xs">
+          <div class="px-2.5 py-1 border border-slate-700 bg-black/60">
+            <span class="text-slate-400">STRESS:</span>
+            <span id="playerStressValue" class="font-bold text-amber-400 ml-1">2</span>
+          </div>
+          <div id="playerStateBadge" class="px-2.5 py-1 border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-bold">
+            GRID: AUXILIARY
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Alert Banner (Acoustic spikes / Warden Injections) -->
+      <div id="playerAlertBanner" class="hidden px-4 py-2 bg-red-950/90 border-b border-red-500 text-red-200 text-xs font-bold flex items-center justify-between">
+        <span id="playerAlertText">WARNING: ACOUSTIC SPIKE DETECTED IN ADJACENT VENTILATION</span>
+        <button onclick="dismissPlayerAlert()" class="text-red-300 hover:text-white underline text-[11px]">ACKNOWLEDGE</button>
+      </div>
+
+      <!-- Player Main 2-Column Interactive Layout -->
+      <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+
+        <!-- Left: Interactive Station Schematic -->
+        <div class="lg:col-span-7 flex flex-col border-r border-amber-500/20 overflow-hidden">
+          <div class="px-3 py-1.5 bg-black/50 border-b border-amber-500/20 flex items-center justify-between text-[11px]">
+            <span class="text-amber-300 font-bold">DECK SCHEMATIC // CLICK CONNECTED NODE TO TRANSIT</span>
+            <span class="text-slate-400">GREEN = CURRENT • CYAN = ACCESSIBLE • RED = LOCKED</span>
+          </div>
+
+          <div class="flex-1 overflow-auto map-canvas relative">
+            <div id="playerMapCanvas" class="relative w-[680px] h-[740px]">
+              <svg id="playerConnectionsSvg" class="absolute inset-0 w-full h-full pointer-events-none"></svg>
+              <div id="playerNodesLayer" class="absolute inset-0"></div>
+            </div>
+          </div>
+
+          <!-- Inventory & Keycard Dock -->
+          <div class="border-t border-amber-500/30 bg-[#0b0f14] p-3 shrink-0">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[11px] font-bold text-cyan-400 tracking-wider">CREW INVENTORY & KEYCARDS</span>
+              <span id="encumbranceBadge" class="hidden text-[10px] px-2 py-0.5 bg-amber-950 border border-amber-500 text-amber-300 font-bold">
+                HEAVY LOAD: ZPM RADIATION / NOISE PENALTY
+              </span>
+            </div>
+            <div id="playerInventoryBar" class="flex flex-wrap gap-2 min-h-[34px]"></div>
+          </div>
+        </div>
+
+        <!-- Right: Current Room Feed, Loot & Terminal Files -->
+        <div class="lg:col-span-5 flex flex-col bg-[#0a0d12] overflow-hidden">
+          <div id="playerRoomDetailPanel" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. TRANSIT PACE MODAL (CAUTIOUS VS RUSHED) -->
+  <div id="transitModal" class="hidden fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
+    <div class="panel-box border-amber-400 max-w-lg w-full p-5 space-y-4 shadow-2xl">
+      <div class="border-b border-slate-800 pb-2">
+        <div class="text-[11px] text-amber-400 font-bold tracking-widest">TRANSIT PROTOCOL // MOVEMENT COST</div>
+        <h3 id="transitTargetTitle" class="font-display text-lg font-bold text-white mt-0.5">MOVING TO [04] CREW QUARTERS</h3>
+      </div>
+      <p id="transitDescription" class="text-xs text-slate-300 leading-relaxed">
+        Select squad movement pace between bulkheads. Moving cautiously consumes station time/upload margin; moving quickly risks acoustic detection or provoking active bio-mechanical threats.
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <button onclick="resolveTransit('cautious')" class="btn-cyan p-3 text-left space-y-1">
+          <div class="font-bold text-xs">[ MOVE CAUTIOUSLY ]</div>
+          <div id="cautiousCostLabel" class="text-[11px] text-cyan-200">+1 Time Tick / +10% Upload</div>
+          <div class="text-[10px] text-slate-400">Quiet movement. Avoids noise roll.</div>
+        </button>
+
+        <button onclick="resolveTransit('rushed')" class="btn-amber p-3 text-left space-y-1">
+          <div class="font-bold text-xs">[ MOVE QUICKLY ]</div>
+          <div id="rushedRiskLabel" class="text-[11px] text-amber-200">30% Noise / Ambush Risk</div>
+          <div class="text-[10px] text-slate-400">Zero time cost. Triggers acoustic check.</div>
+        </button>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal('transitModal')" class="text-xs text-slate-400 hover:text-white px-3 py-1">
+          ABORT MOVEMENT
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. KEYPAD ENTRY MODAL -->
+  <div id="keypadModal" class="hidden fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
+    <div class="panel-box border-cyan-400 max-w-sm w-full p-5 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <div>
+          <div class="text-[10px] text-cyan-400 font-bold">SECURITY CHECKPOINT</div>
+          <h3 id="keypadRoomTitle" class="font-display text-base font-bold text-white">[07] MAIN ENGINEERING</h3>
+        </div>
+        <button onclick="closeModal('keypadModal')" class="text-slate-400 hover:text-white text-sm">✕</button>
+      </div>
+
+      <div id="keypadRequirementStatus" class="text-xs p-2 bg-black/60 border border-slate-800"></div>
+
+      <div class="bg-black border border-cyan-500/40 p-3 text-center">
+        <div class="text-[10px] text-slate-500 mb-1">ENTER 4-DIGIT ACCESS CODE</div>
+        <div id="keypadCodeDisplay" class="font-display text-2xl tracking-[0.4em] text-cyan-300 font-bold h-8">----</div>
+      </div>
+
+      <!-- Numeric Keypad Grid -->
+      <div class="grid grid-cols-3 gap-2">
+        <button onclick="pressKeypadDigit('1')" class="btn-crt py-2.5 font-bold text-sm">1</button>
+        <button onclick="pressKeypadDigit('2')" class="btn-crt py-2.5 font-bold text-sm">2</button>
+        <button onclick="pressKeypadDigit('3')" class="btn-crt py-2.5 font-bold text-sm">3</button>
+        <button onclick="pressKeypadDigit('4')" class="btn-crt py-2.5 font-bold text-sm">4</button>
+        <button onclick="pressKeypadDigit('5')" class="btn-crt py-2.5 font-bold text-sm">5</button>
+        <button onclick="pressKeypadDigit('6')" class="btn-crt py-2.5 font-bold text-sm">6</button>
+        <button onclick="pressKeypadDigit('7')" class="btn-crt py-2.5 font-bold text-sm">7</button>
+        <button onclick="pressKeypadDigit('8')" class="btn-crt py-2.5 font-bold text-sm">8</button>
+        <button onclick="pressKeypadDigit('9')" class="btn-crt py-2.5 font-bold text-sm">9</button>
+        <button onclick="clearKeypadDigits()" class="btn-crimson py-2.5 font-bold text-xs">CLR</button>
+        <button onclick="pressKeypadDigit('0')" class="btn-crt py-2.5 font-bold text-sm">0</button>
+        <button onclick="submitKeypadCode()" class="btn-cyan py-2.5 font-bold text-xs">ENTER</button>
+      </div>
+
+      <div id="keypadFeedbackMsg" class="text-xs text-center font-bold min-h-[18px]"></div>
+    </div>
+  </div>
+
+  <!-- 3. TERMINAL LOG / DOSSIER READER MODAL -->
+  <div id="logReaderModal" class="hidden fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
+    <div class="panel-box border-amber-400 max-w-2xl w-full p-5 space-y-3 max-h-[85vh] flex flex-col">
+      <div class="flex items-start justify-between border-b border-slate-800 pb-2 shrink-0">
+        <div>
+          <div id="logReaderMeta" class="text-[10px] text-cyan-400 font-bold uppercase">ENCRYPTED FILE // CLEARANCE VERIFIED</div>
+          <h3 id="logReaderTitle" class="font-display text-lg font-bold text-amber-400 mt-0.5">PERSONNEL DOSSIER: VANE, ARIS</h3>
+        </div>
+        <button onclick="closeModal('logReaderModal')" class="btn-crt px-2.5 py-1 text-xs font-bold">CLOSE [X]</button>
+      </div>
+      <div id="logReaderBody" class="flex-1 overflow-y-auto text-xs text-slate-200 whitespace-pre-line leading-relaxed bg-black/60 p-3.5 border border-slate-800 font-mono"></div>
+      <div id="logReaderStressNote" class="text-[11px] text-red-400 font-bold shrink-0"></div>
+    </div>
+  </div>
+
+  <!-- 4. LEVEL 10 ULTIMATUM MODAL (ESCAPE VS SELF-DESTRUCT) -->
+  <div id="ultimatumModal" class="hidden fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
+    <div class="panel-box pulse-crimson border-2 border-red-500 max-w-2xl w-full p-6 space-y-5 bg-[#0b0709]">
+      <div class="flex items-center justify-between border-b border-red-900 pb-3">
+        <div>
+          <div class="text-xs text-red-400 font-bold tracking-widest animate-pulse">CRITICAL // LEVEL 10 ESCAPE SHUTTLE BAY</div>
+          <h2 class="font-display text-2xl font-bold text-white mt-1">09 COMMS SPIRE UPLOAD: <span id="ultimatumUploadPct" class="text-red-500">99.4%</span></h2>
+        </div>
+        <span class="px-2.5 py-1 bg-red-600 text-black font-bold text-xs">FINAL OVERRIDE</span>
+      </div>
+
+      <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">
+        The escape shuttle umbilical is pressurized, and the active Reaper is tearing through the outer bulkhead behind you. Above you, the Mind-Core is seconds away from completing its sub-space broadcast—transmitting its self-replicating machine-virus into human shipping lanes.
+      </p>
+
+      <div id="ultimatumOutcomeBox" class="hidden p-4 border text-xs sm:text-sm leading-relaxed space-y-2"></div>
+
+      <div id="ultimatumChoices" class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+        <button onclick="resolveUltimatum('escape')" class="btn-amber p-4 text-left space-y-1.5">
+          <div class="font-display text-base font-bold">[ ESCAPE ]</div>
+          <div class="text-xs font-bold text-amber-200">LAUNCH ESCAPE SHUTTLE</div>
+          <p class="text-[11px] text-slate-300">Sever the umbilical immediately. The crew survives and reaches The Endless Waltz—but the broadcast hits 100% and infects human space.</p>
+        </button>
+
+        <button onclick="resolveUltimatum('destruct')" class="btn-crimson p-4 text-left space-y-1.5">
+          <div class="font-display text-base font-bold">[ SELF-DESTRUCT ]</div>
+          <div class="text-xs font-bold text-red-200">ZPM CONTAINMENT COLLAPSE</div>
+          <p class="text-[11px] text-slate-300">Seal the bay doors and implode the Sovereign Engine. Kills the Mind-Core, the Reapers, and the entire crew—saving humanity in silence.</p>
+        </button>
+      </div>
+
+      <div class="flex justify-end pt-1">
+        <button onclick="closeModal('ultimatumModal')" class="text-[11px] text-slate-500 hover:text-slate-300">
+          [ WARDEN DISMISS ]
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. RESET CONFIRMATION MODAL -->
+  <div id="resetConfirmModal" class="hidden fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4">
+    <div class="panel-box border-red-500 max-w-md w-full p-5 space-y-4">
+      <h3 class="font-display text-base font-bold text-red-400">RESET TO DEFAULT BEACON 3A-R3D?</h3>
+      <p class="text-xs text-slate-300">This will overwrite your current nodes, clocks, and live session state with the original Incident at Beacon 3A-R3D preset.</p>
+      <div class="flex justify-end gap-2">
+        <button onclick="closeModal('resetConfirmModal')" class="btn-crt px-3 py-1.5 text-xs">CANCEL</button>
+        <button onclick="resetToDefaultScenario()" class="btn-crimson px-3 py-1.5 text-xs font-bold">CONFIRM RESET</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="builder-validation.js"></script>
+  <script src="builder-storage.js"></script>
+  <script>
+    // =========================================================================
+    // DEFAULT SCENARIO DATA: INCIDENT AT BEACON 3A-R3D
+    // =========================================================================
+    function createDefaultScenario() {
+      return {
+        title: "INCIDENT AT BEACON 3A-R3D",
+        partyNodeId: "node_01",
+        hunterNodeId: "node_03",
+        stress: 2,
+        inventory: [],
+        worldFlags: {
+          zpmInstalled: false,
+          coreUnlocked: false,
+          virusAwakened: false,
+          lockdown: false,
+          workersProvoked: false
+        },
+        clocks: [
+          {
+            id: "clock_aux",
+            label: "AUXILIARY LIFE SUPPORT",
+            current: 2,
+            max: 12,
+            step: 1,
+            unit: "TICKS"
+          },
+          {
+            id: "clock_upload",
+            label: "09 COMMS BROADCAST UPLOAD",
+            current: 0,
+            max: 100,
+            step: 10,
+            unit: "%"
+          }
+        ],
+        nodes: [
+          {
+            id: "node_01",
+            level: "01",
+            name: "Dropship Landing Rig",
+            x: 60,
+            y: 40,
+            status: "ONLINE",
+            description: "The Endless Waltz sits clamped to the outer gantry. Hard vacuum presses against frost-rimed airlock glass. Auxiliary umbilical cables hum faintly in the dark.",
+            isLocked: false,
+            requiredItemId: "",
+            keypadCode: "",
+            cautiousTick: 1,
+            rushedRisk: 15,
+            connections: ["node_02"],
+            items: [],
+            logs: [
+              {
+                id: "log_01_dock",
+                title: "UM-01 // DOCKING TELEMETRY",
+                author: "AUTOPILOT // ENDLESS WALTZ",
+                stress: 0,
+                body: "DOCKING CLAMPS ENGAGED AT BEACON 3A-R3D.\nEXTERNAL TRANSPONDER: SILENT.\nMAIN REACTOR OUTPUT: 0.00 MW.\nWARNING: SUB-SPACE CARRIER WAVE DETECTED ON HIGH-GAIN DISH (LEVEL 09), CURRENTLY UNPOWERED."
+              }
+            ]
+          },
+          {
+            id: "node_02",
+            level: "02",
+            name: "Docking Bay",
+            x: 240,
+            y: 40,
+            status: "OFFLINE",
+            description: "Cavernous cargo bay illuminated only by emergency floor strips. Magnetic cranes hang frozen mid-hoist. Near the starboard bulkhead, a technician in a yellow rig suit stands completely motionless—copper cabling spliced directly into his spine.",
+            isLocked: false,
+            requiredItemId: "",
+            keypadCode: "",
+            cautiousTick: 1,
+            rushedRisk: 20,
+            connections: ["node_01", "node_03", "node_09"],
+            items: [],
+            logs: [
+              {
+                id: "log_02_boot",
+                title: "SYS_DIAG // STATION BUS STATUS",
+                author: "BEACON 3A-R3D MAIN BUS",
+                stress: 0,
+                body: "CRITICAL ERROR: MAIN REACTOR OFFLINE.\nLIFE SUPPORT: AUXILIARY BATTERY RESERVES ONLY.\nEXTERNAL COMMS (LVL 09): NO MAIN BUS POWER.\nNOTE: EMERGENCY POWER ROUTING REQUIRES SOVEREIGN ENGINE INSTALLATION AT [07] MAIN ENGINEERING."
+              }
+            ]
+          },
+          {
+            id: "node_09",
+            level: "09",
+            name: "Exterior Comms Spire",
+            x: 460,
+            y: 40,
+            status: "OFFLINE",
+            description: "Exposed observation dome beneath the massive deep-space relay dish. Automated servos have locked the array directly toward the Coreward shipping lanes.",
+            isLocked: false,
+            requiredItemId: "",
+            keypadCode: "",
+            cautiousTick: 1,
+            rushedRisk: 25,
+            connections: ["node_02"],
+            items: [],
+            logs: [
+              {
+                id: "log_09_dish",
+                title: "TX_QUEUE // HIGH-GAIN ARRAY",
+                author: "COMMS DAEMON",
+                stress: 1,
+                body: "ERROR: NO MAIN BUS POWER.\nARRAY ALIGNMENT: LOCKED ON CORRIDOR 7 SHIPPING LANES.\nQUEUED PAYLOAD: SELF-REPLICATING POLYMORPHIC KERNEL [4.8 TB].\nSTATUS: AWAITING MAIN GRID SURGE TO INITIATE BROADCAST."
+              }
+            ]
+          },
+          {
+            id: "node_03",
+            level: "03",
+            name: "Service Vents & Catwalk",
+            x: 240,
+            y: 165,
+            status: "OFFLINE",
+            description: "Narrow grated catwalks suspended over dark maintenance shafts. Fresh hydraulic fluid drips from overhead ducting. Something heavy scrapes softly through the metal crawlspace above.",
+            isLocked: false,
+            requiredItemId: "",
+            keypadCode: "",
+            cautiousTick: 1,
+            rushedRisk: 40,
+            connections: ["node_02", "node_04", "node_07"],
+            items: [],
+            logs: []
+          },
+          {
+            id: "node_04",
+            level: "04",
+            name: "Crew Quarters & Mess",
+            x: 60,
+            y: 165,
+            status: "OFFLINE",
+            description: "Half-eaten rations sit petrified on steel tables. Personal lockers hang open. Two crew members are fused upright into the galley wall wiring like grotesque bio-mechanical statues.",
+            isLocked: false,
+            requiredItemId: "",
+            keypadCode: "",
+            cautiousTick: 1,
+            rushedRisk: 25,
+            connections: ["node_03"],
+            items: [
+              {
+                id: "item_key_07",
+                name: "07 Keycard (Code: 4812)",
+                isHeavy: false,
+                installTargetNodeId: ""
+              }
+            ],
+            logs: [
+              {
+                id: "log_04_chief",
+                title: "VOICE_MEMO // CHIEF ENG. TORRES",
+                author: "L. TORRES",
+                stress: 1,
+                body: "They're not dead. I watched Miller stand against the conduit junction for six hours without blinking while copper filaments grew out of his collar. Vane says the Mind-Core is 'optimizing' our hardware. I hid the Engineering keycard under my bunk—nobody turns the main power back on. Nobody."
+              }
+            ]
+          },
+          {
+            id: "node_07",
+            level: "07",
+            name: "Main Engineering",
+            x: 240,
+            y: 300,
+            status: "LOCKED",
+            description: "The primary fusion core has been deliberately gutted. At the center of the room sits an empty hexagonal containment cradle wired directly into the station's primary power bus and the heavy blast doors of 07B.",
+            isLocked: true,
+            requiredItemId: "item_key_07",
+            keypadCode: "4812",
+            cautiousTick: 1,
+            rushedRisk: 30,
+            connections: ["node_03", "node_06", "node_07b"],
+            items: [
+              {
+                id: "item_key_06",
+                name: "06 Keycard (Code: 7390)",
+                isHeavy: false,
+                installTargetNodeId: ""
+              }
+            ],
+            logs: [
+              {
+                id: "log_07_power",
+                title: "ENG_LOG // SOVEREIGN ENGINE SPEC",
+                author: "DR. ARIS VANE",
+                stress: 0,
+                body: "PRIMARY REACTOR DECOMMISSIONED. ALL GRID BUSES ROUTED TO ACCEPT THE MODULAR ZPM PROTOTYPE ('SOVEREIGN ENGINE') CURRENTLY STORED IN [08] DEEP RESEARCH.\nWARNING: INSERTING THE ZPM WILL FLOOD ALL STATION DECKS, UNSEAL [07B] MAINFRAME CORE, AND ENERGIZE [09] EXTERIOR COMMS SPIRE."
+              },
+              {
+                id: "log_07_kestrel",
+                title: "VAD_DIRECTIVE // PRIORITY ALPHA",
+                author: "MARA KESTREL (VAD LIAISON)",
+                stress: 1,
+                body: "DOSSIER // KESTREL, MARA (SENIOR OPERATIONS LIAISON, VANGUARD AERO-DEFENSE)\nDIRECTIVE TO DR. VANE: 'Life support is non-essential variance. Route 100% of Sovereign Engine output to 07B and the Level 09 transmitter. Once the polymorphic signal hits the shipping lanes, VAD owns every automated hull in the sector.'"
+              }
+            ]
+          },
+          {
+            id: "node_06",
+            level: "06",
+            name: "Security Checkpoint",
+            x: 60,
+            y: 300,
+            status: "LOCKED",
+            description: "Reinforced ballistic glass and automated turret mounts—currently unpowered. Banks of CCTV monitors show frozen static and silhouette outlines of crew statues standing in every corridor.",
+            isLocked: true,
+            requiredItemId: "item_key_06",
+            keypadCode: "7390",
+            cautiousTick: 1,
+            rushedRisk: 30,
+            connections: ["node_07", "node_05", "node_10"],
+            items: [
+              {
+                id: "item_key_05",
+                name: "05 Keycard (Code: 1904)",
+                isHeavy: false,
+                installTargetNodeId: ""
+              }
+            ],
+            logs: [
+              {
+                id: "log_06_sec",
+                title: "SEC_ARCHIVE // LOCKDOWN OVERRIDE",
+                author: "CAPT. D. RHOADES",
+                stress: 1,
+                body: "Kestrel locked us in from the outside. When the things in the walls moved, they didn't even shoot back—they just grabbed our riflemen and started welding them into the bulkhead junction boxes. Only ONE of them is hunting us. The rest just... build."
+              }
+            ]
+          },
+          {
+            id: "node_05",
+            level: "05",
+            name: "Med-Lab & Cryo-Stasis",
+            x: 60,
+            y: 440,
+            status: "LOCKED",
+            description: "Shattered cryo-stasis tubes leak pale coolant across surgical steel. Half-assembled bio-mechanical limbs hang from overhead tracks beside diagnostic monitors.",
+            isLocked: true,
+            requiredItemId: "item_key_05",
+            keypadCode: "1904",
+            cautiousTick: 1,
+            rushedRisk: 35,
+            connections: ["node_06", "node_08"],
+            items: [
+              {
+                id: "item_key_08",
+                name: "08 Keycard (Code: 8821)",
+                isHeavy: false,
+                installTargetNodeId: ""
+              }
+            ],
+            logs: [
+              {
+                id: "log_05_vane",
+                title: "DOSSIER // DR. ARIS VANE",
+                author: "PROJECT SOVEREIGN ARCHIVE",
+                stress: 1,
+                body: "PERSONNEL DOSSIER: VANE, ARIS (DR.) — LEAD SYSTEMS ARCHITECT\nSTATUS: ASSIMILATED / INTEGRATED\nNOTES: Vane treated the machine-virus as a higher-order consciousness. Medical scans confirm human cerebral tissue was forcibly bridged into copper bus lines to construct the 07B Mind-Core. Vane's personal keycard to Deep Research (08) was recovered from his lab coat."
+              }
+            ]
+          },
+          {
+            id: "node_08",
+            level: "08",
+            name: "Deep Research Sub-Level",
+            x: 240,
+            y: 440,
+            status: "LOCKED",
+            description: "Sweltering heat radiates from pulsing sub-space coils. Suspended inside a magnetic containment rig is the Sovereign Engine—a glowing, translucent crystalline cylinder humming with immense zero-point vacuum energy.",
+            isLocked: true,
+            requiredItemId: "item_key_08",
+            keypadCode: "8821",
+            cautiousTick: 1,
+            rushedRisk: 35,
+            connections: ["node_05"],
+            items: [
+              {
+                id: "item_zpm",
+                name: "ZPM: Sovereign Engine [HEAVY]",
+                isHeavy: true,
+                installTargetNodeId: "node_07"
+              }
+            ],
+            logs: [
+              {
+                id: "log_08_zpm",
+                title: "SYS_WARN // ZERO-POINT EXTRACTION",
+                author: "CONTAINMENT RIG 08",
+                stress: 1,
+                body: "SOVEREIGN ENGINE READY FOR MANUAL EXTRACTION.\nCAUTION: MODULE MASS EXCEEDS 45 KG AND EMITS CONTINUOUS SUB-SPACE INTERFERENCE. TRANSPORTING MODULE TO [07] MAIN ENGINEERING WILL INCREASE ACOUSTIC/SENSOR SIGNATURE."
+              }
+            ]
+          },
+          {
+            id: "node_07b",
+            level: "07B",
+            name: "Mainframe Core (Mind-Core)",
+            x: 460,
+            y: 300,
+            status: "LOCKED",
+            description: "A cathedral of server racks fused with harvested neural tissue and rhythmic, pulsing optical cables. Two massive, heavily armored Guardian Reapers flank the central console where Dr. Vane's assimilated remains clutch the Level 10 Escape Keycard.",
+            isLocked: true,
+            requiredItemId: "FLAG_CORE_UNLOCKED",
+            keypadCode: "0000",
+            cautiousTick: 1,
+            rushedRisk: 65,
+            connections: ["node_07"],
+            items: [
+              {
+                id: "item_key_10",
+                name: "10 Keycard (Code: 9999)",
+                isHeavy: false,
+                installTargetNodeId: ""
+              }
+            ],
+            logs: [
+              {
+                id: "log_07b_mind",
+                title: "MIND-CORE // BROADCAST KERNEL",
+                author: "07B COLLECTIVE",
+                stress: 2,
+                body: "BIOLOGICAL LATENCY ELIMINATED. TRANSMITTING SIGNAL TO LEVEL 09 SPIRE.\nALL HUMAN VESSELS IN SECTOR WILL BE INTEGRATED.\nESCAPE SHUTTLE ACCESS KEYCARD RETRIEVED FROM CENTRAL CONSOLE."
+              }
+            ]
+          },
+          {
+            id: "node_10",
+            level: "10",
+            name: "Escape Shuttle Bay",
+            x: 460,
+            y: 440,
+            status: "LOCKED",
+            description: "A single gleaming corporate lifeboat sits ready on the launch rail. Beside the airlock sits the Master Station Override Console—wired directly into both the shuttle launch clamps and the Sovereign Engine's containment core.",
+            isLocked: true,
+            requiredItemId: "item_key_10",
+            keypadCode: "9999",
+            cautiousTick: 1,
+            rushedRisk: 50,
+            connections: ["node_06"],
+            items: [],
+            logs: [
+              {
+                id: "log_10_final",
+                title: "MASTER OVERRIDE // ULTIMATUM",
+                author: "STATION CORE",
+                stress: 1,
+                body: "SHUTTLE BAY UNLOCKED.\nCHOOSE PROTOCOL:\n1) [ ESCAPE ] — LAUNCH IMMEDIATELY. CREW SURVIVES; 09 BROADCAST COMPLETES.\n2) [ SELF-DESTRUCT ] — COLLAPSE ZPM CONTAINMENT. TOTAL STATION ANNIHILATION."
+              }
+            ]
+          }
+        ]
+      };
+    }
+
+    // =========================================================================
+    // APPLICATION STATE
+    // =========================================================================
+    const projectStorage = createBuilderStorage("warden_builder_scenario_v1", BUILDER_VALIDATION.scenario, createDefaultScenario);
+    let scenario = loadScenarioFromStorage();
+    let currentMode = "builder"; // 'builder' | 'player' | 'split'
+    let selectedNodeId = scenario.nodes[0]?.id || "node_01";
+    let pendingTransitNodeId = null;
+    let pendingKeypadNodeId = null;
+    let currentKeypadDigits = "";
+
+    // Dragging state for Builder Map
+    let draggingNodeId = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    function loadScenarioFromStorage() {
+      return projectStorage.load();
+    }
+
+    function saveScenarioToStorage() {
+      projectStorage.save(scenario);
+    }
+
+    function logWardenEvent(msg, level = "info") {
+      const feed = document.getElementById("wardenLogFeed");
+      if (!feed) return;
+      const now = new Date();
+      const ts = now.toTimeString().split(" ")[0];
+      const colorClass =
+        level === "danger" ? "text-red-400 font-bold" :
+        level === "warn" ? "text-amber-300" :
+        level === "cyan" ? "text-cyan-300" : "text-slate-300";
+
+      const row = document.createElement("div");
+      row.className = colorClass;
+      row.textContent = `[${ts}] ${msg}`;
+      feed.prepend(row);
+    }
+
+    function clearWardenLog() {
+      document.getElementById("wardenLogFeed").innerHTML = "";
+    }
+
+    // =========================================================================
+    // MODE SWITCHING & GLOBAL RENDER
+    // =========================================================================
+    function setMode(mode) {
+      currentMode = mode;
+      const builderView = document.getElementById("builderView");
+      const playerView = document.getElementById("playerView");
+      const btnB = document.getElementById("btnModeBuilder");
+      const btnP = document.getElementById("btnModePlayer");
+      const btnS = document.getElementById("btnModeSplit");
+
+      [btnB, btnP, btnS].forEach(b => {
+        if (!b) return;
+        b.className = "px-3 py-1 text-xs font-bold tracking-wider transition text-slate-400 hover:text-white";
+      });
+      btnS.classList.add("hidden", "xl:inline-block");
+
+      if (mode === "builder") {
+        builderView.classList.remove("hidden");
+        builderView.classList.add("flex-1");
+        playerView.classList.add("hidden");
+        btnB.classList.add("bg-amber-400", "text-black");
+      } else if (mode === "player") {
+        builderView.classList.add("hidden");
+        playerView.classList.remove("hidden");
+        playerView.classList.add("flex-1");
+        btnP.classList.add("bg-cyan-400", "text-black");
+      } else if (mode === "split") {
+        builderView.classList.remove("hidden");
+        playerView.classList.remove("hidden");
+        builderView.className = "w-3/5 grid grid-cols-1 lg:grid-cols-12 overflow-hidden h-full border-r-2 border-amber-500/50";
+        playerView.className = "w-2/5 flex flex-col bg-[#07090c] text-amber-400 overflow-hidden h-full relative";
+        btnS.classList.add("bg-emerald-400", "text-black");
+      }
+
+      if (mode !== "split") {
+        builderView.className = (mode === "builder" ? "flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden h-full" : "hidden");
+        playerView.className = (mode === "player" ? "flex-1 flex flex-col bg-[#07090c] text-amber-400 overflow-hidden h-full relative" : "hidden");
+      }
+
+      renderAll();
+    }
+
+    function renderAll() {
+      document.getElementById("scenarioTitleInput").value = scenario.title;
+      renderBuilderMap();
+      renderBuilderClocks();
+      renderInspector();
+      renderWardenPanel();
+      renderPlayerTerminal();
+      saveScenarioToStorage();
+    }
+
+    document.getElementById("scenarioTitleInput").addEventListener("input", (e) => {
+      scenario.title = e.target.value;
+      document.getElementById("playerStationHeader").textContent = `${scenario.title.toUpperCase()} // CREW INTERFACE`;
+      saveScenarioToStorage();
+    });
+
+    // =========================================================================
+    // 1. BUILDER LEFT PANEL: MAP & CLOCKS
+    // =========================================================================
+    function renderBuilderMap() {
+      const svg = document.getElementById("builderConnectionsSvg");
+      const layer = document.getElementById("builderNodesLayer");
+      svg.innerHTML = "";
+      layer.innerHTML = "";
+
+      // Draw connections
+      const drawnPairs = new Set();
+      scenario.nodes.forEach(node => {
+        (node.connections || []).forEach(targetId => {
+          const target = scenario.nodes.find(n => n.id === targetId);
+          if (!target) return;
+          const pairKey = [node.id, target.id].sort().join("--");
+          if (drawnPairs.has(pairKey)) return;
+          drawnPairs.add(pairKey);
+
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", node.x + 75);
+          line.setAttribute("y1", node.y + 34);
+          line.setAttribute("x2", target.x + 75);
+          line.setAttribute("y2", target.y + 34);
+          line.setAttribute("stroke", "#334155");
+          line.setAttribute("stroke-width", "2");
+          line.setAttribute("stroke-dasharray", node.isLocked || target.isLocked ? "5,4" : "none");
+          svg.appendChild(line);
+        });
+      });
+
+      // Draw Node Cards
+      scenario.nodes.forEach(node => {
+        const isSelected = node.id === selectedNodeId;
+        const hasParty = scenario.partyNodeId === node.id;
+        const hasHunter = scenario.hunterNodeId === node.id;
+        const hasLoot = node.items && node.items.length > 0;
+
+        const el = document.createElement("div");
+        el.style.left = `${node.x}px`;
+        el.style.top = `${node.y}px`;
+        el.className = `node-card absolute w-[150px] p-2 bg-[#0f141b] border cursor-grab active:cursor-grabbing ${
+          isSelected
+            ? "border-cyan-400 shadow-[0_0_12px_rgba(0,229,255,0.35)] z-20"
+            : node.isLocked
+            ? "border-red-500/60 z-10"
+            : "border-slate-700 hover:border-amber-400 z-10"
+        }`;
+
+        el.innerHTML = `
+          <div class="flex items-center justify-between text-[10px] font-bold">
+            <span class="text-amber-400">[${escapeHtml(node.level)}]</span>
+            <div class="flex items-center gap-1">
+              ${hasParty ? `<span class="px-1 bg-emerald-500 text-black text-[9px]" title="Crew Here">CREW</span>` : ""}
+              ${hasHunter ? `<span class="px-1 bg-red-600 text-white text-[9px]" title="Active Hunter Reaper">HUNT</span>` : ""}
+              ${node.isLocked ? `<span class="text-red-400" title="Locked">🔒</span>` : ""}
+              ${hasLoot ? `<span class="text-cyan-300" title="Contains Loot">📦</span>` : ""}
+            </div>
+          </div>
+          <div class="text-[11px] font-bold text-slate-100 truncate mt-0.5">${escapeHtml(node.name)}</div>
+          <div class="flex items-center justify-between text-[9px] text-slate-400 mt-1">
+            <span>${node.status}</span>
+            <span>Risk: ${node.rushedRisk}%</span>
+          </div>
+        `;
+
+        el.addEventListener("mousedown", (e) => {
+          selectedNodeId = node.id;
+          draggingNodeId = node.id;
+          dragOffsetX = e.clientX - node.x;
+          dragOffsetY = e.clientY - node.y;
+          renderInspector();
+          renderBuilderMap();
+        });
+
+        layer.appendChild(el);
+      });
+    }
+
+    window.addEventListener("mousemove", (e) => {
+      if (!draggingNodeId) return;
+      const node = scenario.nodes.find(n => n.id === draggingNodeId);
+      if (!node) return;
+      node.x = Math.max(8, Math.min(520, Math.round((e.clientX - dragOffsetX) / 8) * 8));
+      node.y = Math.max(8, Math.min(660, Math.round((e.clientY - dragOffsetY) / 8) * 8));
+      renderBuilderMap();
+      if (currentMode === "split") renderPlayerMap();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (draggingNodeId) {
+        draggingNodeId = null;
+        saveScenarioToStorage();
+        renderInspector();
+      }
+    });
+
+    function addNewNode() {
+      const nextNum = String(scenario.nodes.length + 1).padStart(2, "0");
+      const newId = "node_" + crypto.randomUUID();
+      const newNode = {
+        id: newId,
+        level: nextNum,
+        name: `New Sector ${nextNum}`,
+        x: 160 + (scenario.nodes.length % 4) * 35,
+        y: 120 + (scenario.nodes.length % 5) * 35,
+        status: "OFFLINE",
+        description: "Uncharted station compartment. Bulkhead telemetry nominal.",
+        isLocked: false,
+        requiredItemId: "",
+        keypadCode: "1234",
+        cautiousTick: 1,
+        rushedRisk: 25,
+        connections: selectedNodeId ? [selectedNodeId] : [],
+        items: [],
+        logs: []
+      };
+
+      if (selectedNodeId) {
+        const prev = scenario.nodes.find(n => n.id === selectedNodeId);
+        if (prev && !prev.connections.includes(newId)) prev.connections.push(newId);
+      }
+
+      scenario.nodes.push(newNode);
+      selectedNodeId = newId;
+      logWardenEvent(`Added new room [${nextNum}] ${newNode.name}`, "cyan");
+      renderAll();
+    }
+
+    function deleteSelectedNode() {
+      if (scenario.nodes.length <= 1) return;
+      const idx = scenario.nodes.findIndex(n => n.id === selectedNodeId);
+      if (idx === -1) return;
+      const removed = scenario.nodes[idx];
+      scenario.nodes.splice(idx, 1);
+
+      // Clean references
+      scenario.nodes.forEach(n => {
+        n.connections = (n.connections || []).filter(cid => cid !== removed.id);
+      });
+      if (scenario.partyNodeId === removed.id) scenario.partyNodeId = scenario.nodes[0].id;
+      if (scenario.hunterNodeId === removed.id) scenario.hunterNodeId = scenario.nodes[0].id;
+      selectedNodeId = scenario.nodes[0].id;
+      logWardenEvent(`Deleted room [${removed.level}] ${removed.name}`, "warn");
+      renderAll();
+    }
+
+    function renderBuilderClocks() {
+      const list = document.getElementById("builderClocksList");
+      list.innerHTML = "";
+      scenario.clocks.forEach(clock => {
+        const pct = Math.min(100, Math.round((clock.current / clock.max) * 100));
+        const div = document.createElement("div");
+        div.className = "p-2 bg-black/50 border border-slate-800 space-y-1";
+        div.innerHTML = `
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-bold text-amber-300 truncate">${escapeHtml(clock.label)}</span>
+            <div class="flex items-center gap-1">
+              <button onclick="stepClock('${clock.id}', -${clock.step})" class="btn-crt px-1.5 py-0.2 font-bold">-</button>
+              <span class="font-bold text-white px-1">${clock.current}/${clock.max} ${clock.unit}</span>
+              <button onclick="stepClock('${clock.id}', ${clock.step})" class="btn-crt px-1.5 py-0.2 font-bold">+</button>
+            </div>
+          </div>
+          <div class="w-full h-1.5 bg-slate-900 overflow-hidden">
+            <div class="h-full ${pct >= 80 ? 'bg-red-500' : 'bg-amber-400'} transition-all" style="width:${pct}%"></div>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function stepClock(clockId, delta) {
+      const clock = scenario.clocks.find(c => c.id === clockId);
+      if (!clock) return;
+      clock.current = Math.max(0, Math.min(clock.max, clock.current + delta));
+      logWardenEvent(`Clock '${clock.label}' adjusted to ${clock.current}${clock.unit}`, clock.current >= clock.max * 0.8 ? "danger" : "info");
+      renderAll();
+    }
+
+    function addGlobalClock() {
+      const label = "NEW THREAT CLOCK";
+      scenario.clocks.push({
+        id: "clock_" + crypto.randomUUID(),
+        label,
+        current: 0,
+        max: 10,
+        step: 1,
+        unit: "TICKS"
+      });
+      renderAll();
+    }
+
+    // =========================================================================
+    // 2. BUILDER CENTER PANEL: ROOM & TERMINAL INSPECTOR
+    // =========================================================================
+    function renderInspector() {
+      const container = document.getElementById("inspectorContent");
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node) {
+        container.innerHTML = `<div class="text-slate-500">Select a room on the map to inspect.</div>`;
+        return;
+      }
+
+      // Collect all items across scenario for keycard requirement dropdown
+      const allItems = [];
+      scenario.nodes.forEach(n => (n.items || []).forEach(it => allItems.push(it)));
+
+      const otherNodes = scenario.nodes.filter(n => n.id !== node.id);
+
+      container.innerHTML = `
+        <!-- Identity & Coordinates -->
+        <div class="panel-box p-2.5 space-y-2">
+          <div class="font-display text-[11px] font-bold text-amber-400 uppercase">Room Identity & Coordinates</div>
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Level Code</label>
+              <input type="text" value="${escapeHtml(node.level)}" onchange="updateNodeField('level', this.value)" class="w-full font-bold text-amber-300" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-[10px] text-slate-400 mb-0.5">Room Name</label>
+              <input type="text" value="${escapeHtml(node.name)}" onchange="updateNodeField('name', this.value)" class="w-full" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Status</label>
+              <select onchange="updateNodeField('status', this.value)" class="w-full">
+                <option value="ONLINE" ${node.status === 'ONLINE' ? 'selected' : ''}>ONLINE</option>
+                <option value="OFFLINE" ${node.status === 'OFFLINE' ? 'selected' : ''}>OFFLINE</option>
+                <option value="LOCKED" ${node.status === 'LOCKED' ? 'selected' : ''}>LOCKED</option>
+                <option value="BREACHED" ${node.status === 'BREACHED' ? 'selected' : ''}>BREACHED</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Map X</label>
+              <input type="number" value="${node.x}" onchange="updateNodeField('x', parseInt(this.value)||0)" class="w-full" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Map Y</label>
+              <input type="number" value="${node.y}" onchange="updateNodeField('y', parseInt(this.value)||0)" class="w-full" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[10px] text-slate-400 mb-0.5">Atmospheric Description</label>
+            <textarea rows="3" onchange="updateNodeField('description', this.value)" class="w-full">${escapeHtml(node.description)}</textarea>
+          </div>
+        </div>
+
+        <!-- Security & Access Controls -->
+        <div class="panel-box p-2.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-display text-[11px] font-bold text-red-400 uppercase">Security & Keypad Lock</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" ${node.isLocked ? 'checked' : ''} onchange="updateNodeField('isLocked', this.checked)" class="accent-red-500" />
+              <span class="text-[11px] font-bold ${node.isLocked ? 'text-red-400' : 'text-slate-400'}">${node.isLocked ? 'LOCKED' : 'UNLOCKED'}</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">4-Digit Keypad Code</label>
+              <input type="text" maxlength="4" value="${escapeHtml(node.keypadCode || '')}" onchange="updateNodeField('keypadCode', this.value)" class="w-full font-bold tracking-widest text-cyan-300" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Required Keycard / Trigger</label>
+              <select onchange="updateNodeField('requiredItemId', this.value)" class="w-full">
+                <option value="">-- Code Only / None --</option>
+                <option value="FLAG_CORE_UNLOCKED" ${node.requiredItemId === 'FLAG_CORE_UNLOCKED' ? 'selected' : ''}>[EVENT] ZPM Installed (07B)</option>
+                ${allItems.map(it => `<option value="${it.id}" ${node.requiredItemId === it.id ? 'selected' : ''}>${escapeHtml(it.name)}</option>`).join("")}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transit Cost Configuration -->
+        <div class="panel-box p-2.5 space-y-2">
+          <div class="font-display text-[11px] font-bold text-cyan-400 uppercase">Transit Cost (Time vs. Noise)</div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Cautious Time Cost (Ticks)</label>
+              <input type="number" min="0" max="10" value="${node.cautiousTick ?? 1}" onchange="updateNodeField('cautiousTick', parseInt(this.value)||0)" class="w-full" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-0.5">Rushed Noise Risk (%)</label>
+              <input type="number" min="0" max="100" step="5" value="${node.rushedRisk ?? 25}" onchange="updateNodeField('rushedRisk', parseInt(this.value)||0)" class="w-full text-amber-300" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Room Connections -->
+        <div class="panel-box p-2.5 space-y-2">
+          <div class="font-display text-[11px] font-bold text-slate-300 uppercase">Connected Corridors / Vents</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${otherNodes.map(other => {
+              const connected = (node.connections || []).includes(other.id);
+              return `
+                <button onclick="toggleNodeConnection('${other.id}')" class="px-2 py-1 text-[10px] border ${
+                  connected ? 'border-cyan-400 bg-cyan-950/50 text-cyan-200 font-bold' : 'border-slate-800 text-slate-500 hover:text-slate-300'
+                }">
+                  [${escapeHtml(other.level)}] ${escapeHtml(other.name)}
+                </button>
+              `;
+            }).join("")}
+          </div>
+        </div>
+
+        <!-- Loot & Keycards -->
+        <div class="panel-box p-2.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-display text-[11px] font-bold text-emerald-400 uppercase">Loot, Keycards & Heavy Assets</span>
+            <button onclick="addNodeItem()" class="text-[11px] text-emerald-400 hover:underline font-bold">+ Add Item</button>
+          </div>
+          <div class="space-y-2">
+            ${(node.items || []).map((item, idx) => `
+              <div class="p-2 bg-black/50 border border-slate-800 space-y-1.5">
+                <div class="flex gap-1.5">
+                  <input type="text" value="${escapeHtml(item.name)}" onchange="updateNodeItem(${idx}, 'name', this.value)" class="flex-1 font-semibold text-emerald-300" />
+                  <button onclick="removeNodeItem(${idx})" class="text-red-400 px-1.5 font-bold">✕</button>
+                </div>
+                <div class="flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                  <label class="flex items-center gap-1 text-amber-300 cursor-pointer">
+                    <input type="checkbox" ${item.isHeavy ? 'checked' : ''} onchange="updateNodeItem(${idx}, 'isHeavy', this.checked)" />
+                    <span>Heavy / Encumbering (ZPM Rule)</span>
+                  </label>
+                  <div class="flex items-center gap-1">
+                    <span class="text-slate-400">Install Target:</span>
+                    <select onchange="updateNodeItem(${idx}, 'installTargetNodeId', this.value)" class="py-0.5 text-[10px]">
+                      <option value="">None</option>
+                      ${scenario.nodes.map(n => `<option value="${n.id}" ${item.installTargetNodeId === n.id ? 'selected' : ''}>[${escapeHtml(n.level)}] ${escapeHtml(n.name)}</option>`).join("")}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            `).join("") || `<div class="text-[11px] text-slate-500 italic">No physical items in this room.</div>`}
+          </div>
+        </div>
+
+        <!-- Terminal Logs & Dossiers -->
+        <div class="panel-box p-2.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-display text-[11px] font-bold text-amber-400 uppercase">Terminal Logs & Dossiers</span>
+            <button onclick="addNodeLog()" class="text-[11px] text-amber-400 hover:underline font-bold">+ Add Log File</button>
+          </div>
+          <div class="space-y-2.5">
+            ${(node.logs || []).map((log, idx) => `
+              <div class="p-2 bg-black/60 border border-slate-800 space-y-1.5">
+                <div class="flex gap-1.5">
+                  <input type="text" value="${escapeHtml(log.title)}" onchange="updateNodeLog(${idx}, 'title', this.value)" class="flex-1 font-bold text-amber-300" placeholder="File Title" />
+                  <button onclick="removeNodeLog(${idx})" class="text-red-400 px-1.5 font-bold">✕</button>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5">
+                  <input type="text" value="${escapeHtml(log.author || '')}" onchange="updateNodeLog(${idx}, 'author', this.value)" class="col-span-2 text-[10px]" placeholder="Author / Source" />
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] text-red-400">Stress:</span>
+                    <input type="number" min="0" max="5" value="${log.stress || 0}" onchange="updateNodeLog(${idx}, 'stress', parseInt(this.value)||0)" class="w-full text-[10px]" />
+                  </div>
+                </div>
+                <textarea rows="3" onchange="updateNodeLog(${idx}, 'body', this.value)" class="w-full text-[11px]">${escapeHtml(log.body)}</textarea>
+              </div>
+            `).join("") || `<div class="text-[11px] text-slate-500 italic">No terminal files stored on this node.</div>`}
+          </div>
+        </div>
+      `;
+    }
+
+    function updateNodeField(field, value) {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node) return;
+      node[field] = value;
+      if (field === "isLocked") {
+        node.status = value ? "LOCKED" : "ONLINE";
+      }
+      renderAll();
+    }
+
+    function toggleNodeConnection(targetId) {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      const target = scenario.nodes.find(n => n.id === targetId);
+      if (!node || !target) return;
+
+      node.connections = node.connections || [];
+      target.connections = target.connections || [];
+
+      if (node.connections.includes(targetId)) {
+        node.connections = node.connections.filter(id => id !== targetId);
+        target.connections = target.connections.filter(id => id !== node.id);
+      } else {
+        node.connections.push(targetId);
+        if (!target.connections.includes(node.id)) target.connections.push(node.id);
+      }
+      renderAll();
+    }
+
+    function addNodeItem() {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node) return;
+      node.items = node.items || [];
+      node.items.push({
+        id: "item_" + crypto.randomUUID(),
+        name: "Access Keycard",
+        isHeavy: false,
+        installTargetNodeId: ""
+      });
+      renderAll();
+    }
+
+    function updateNodeItem(idx, field, value) {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node || !node.items[idx]) return;
+      node.items[idx][field] = value;
+      renderAll();
+    }
+
+    function removeNodeItem(idx) {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node) return;
+      node.items.splice(idx, 1);
+      renderAll();
+    }
+
+    function addNodeLog() {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node) return;
+      node.logs = node.logs || [];
+      node.logs.push({
+        id: "log_" + crypto.randomUUID(),
+        title: "SYS_LOG // NEW ENTRY",
+        author: "SYSTEM ARCHIVE",
+        stress: 0,
+        body: "Enter terminal log or dossier text..."
+      });
+      renderAll();
+    }
+
+    function updateNodeLog(idx, field, value) {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node || !node.logs[idx]) return;
+      node.logs[idx][field] = value;
+      renderAll();
+    }
+
+    function removeNodeLog(idx) {
+      const node = scenario.nodes.find(n => n.id === selectedNodeId);
+      if (!node) return;
+      node.logs.splice(idx, 1);
+      renderAll();
+    }
+
+    // =========================================================================
+    // 3. BUILDER RIGHT PANEL: LIVE WARDEN CONTROLLER
+    // =========================================================================
+    function renderWardenPanel() {
+      const partySel = document.getElementById("wardenPartyNodeSelect");
+      const hunterSel = document.getElementById("wardenHunterNodeSelect");
+      const optionsHtml = scenario.nodes
+        .map(n => `<option value="${n.id}">[${escapeHtml(n.level)}] ${escapeHtml(n.name)}</option>`)
+        .join("");
+
+      partySel.innerHTML = optionsHtml;
+      partySel.value = scenario.partyNodeId;
+
+      hunterSel.innerHTML = optionsHtml;
+      hunterSel.value = scenario.hunterNodeId;
+
+      document.getElementById("wardenStressDisplay").textContent = scenario.stress;
+
+      document.getElementById("flagZpmInstalled").checked = !!scenario.worldFlags.zpmInstalled;
+      document.getElementById("flagCoreUnlocked").checked = !!scenario.worldFlags.coreUnlocked;
+      document.getElementById("flagVirusAwakened").checked = !!scenario.worldFlags.virusAwakened;
+      document.getElementById("flagLockdown").checked = !!scenario.worldFlags.lockdown;
+
+      const btnWorkers = document.getElementById("btnToggleWorkerStatus");
+      if (!scenario.worldFlags.virusAwakened) {
+        btnWorkers.textContent = "DORMANT STATUES";
+        btnWorkers.className = "px-2 py-1 text-[11px] font-bold border border-slate-600 text-slate-400";
+      } else if (scenario.worldFlags.workersProvoked) {
+        btnWorkers.textContent = "HOSTILE SWARM!";
+        btnWorkers.className = "px-2 py-1 text-[11px] font-bold border border-red-500 bg-red-950 text-red-300 animate-pulse";
+      } else {
+        btnWorkers.textContent = "PASSIVE (VIRUS)";
+        btnWorkers.className = "px-2 py-1 text-[11px] font-bold border border-amber-500 bg-amber-950/60 text-amber-300";
+      }
+    }
+
+    function movePartyDirect(nodeId) {
+      scenario.partyNodeId = nodeId;
+      const node = scenario.nodes.find(n => n.id === nodeId);
+      logWardenEvent(`Warden moved Crew to [${node.level}] ${node.name}`, "cyan");
+      renderAll();
+    }
+
+    function moveHunterReaper(nodeId) {
+      scenario.hunterNodeId = nodeId;
+      const node = scenario.nodes.find(n => n.id === nodeId);
+      logWardenEvent(`1 Active Hunter Reaper stalked into [${node.level}] ${node.name}`, "danger");
+      if (scenario.hunterNodeId === scenario.partyNodeId) {
+        showPlayerAlert(`CRITICAL PROXIMITY ALERT: APEX REAPER SIGNATURE DETECTED IN [${node.level}] ${node.name.toUpperCase()}!`);
+      }
+      renderAll();
+    }
+
+    function toggleWorkerReapersState() {
+      if (!scenario.worldFlags.virusAwakened) {
+        scenario.worldFlags.virusAwakened = true;
+        scenario.worldFlags.workersProvoked = false;
+        logWardenEvent("Worker Reapers awakened in PASSIVE Virus maintenance mode.", "warn");
+      } else {
+        scenario.worldFlags.workersProvoked = !scenario.worldFlags.workersProvoked;
+        logWardenEvent(
+          scenario.worldFlags.workersProvoked
+            ? "ALERT: Worker Reapers PROVOKED into lethal hostility!"
+            : "Worker Reapers returned to passive maintenance tasks.",
+          scenario.worldFlags.workersProvoked ? "danger" : "warn"
+        );
+        if (scenario.worldFlags.workersProvoked) {
+          showPlayerAlert("BIO-MECHANICAL HIVE ALERT: STATION WORKER UNITS HAVE BECOME HOSTILE!");
+        }
+      }
+      renderAll();
+    }
+
+    function toggleWorldFlag(flag, state) {
+      scenario.worldFlags[flag] = state;
+
+      // Automated cascading logic for Beacon 3A-R3D ZPM surge
+      if (flag === "zpmInstalled" && state) {
+        scenario.worldFlags.coreUnlocked = true;
+        scenario.worldFlags.virusAwakened = true;
+
+        const node07 = scenario.nodes.find(n => n.id === "node_07");
+        const node07b = scenario.nodes.find(n => n.id === "node_07b");
+        const node09 = scenario.nodes.find(n => n.id === "node_09");
+        if (node07) node07.status = "ONLINE";
+        if (node07b) {
+          node07b.isLocked = false;
+          node07b.status = "BREACHED";
+        }
+        if (node09) node09.status = "ONLINE";
+
+        const uploadClock = scenario.clocks.find(c => c.id === "clock_upload");
+        if (uploadClock && uploadClock.current === 0) uploadClock.current = 20;
+
+        showPlayerAlert("POWER SURGE: SOVEREIGN ENGINE ONLINE! 07B BLAST DOORS OPENED • 09 COMMS BROADCAST INITIATED • STATION STATUES ANIMATING!");
+        logWardenEvent("ZPM SURGE: Grid online, 07B unsealed, Virus workers active, 09 Upload started.", "danger");
+      } else if (flag === "coreUnlocked") {
+        const node07b = scenario.nodes.find(n => n.id === "node_07b");
+        if (node07b) {
+          node07b.isLocked = !state;
+          node07b.status = state ? "BREACHED" : "LOCKED";
+        }
+      } else if (flag === "lockdown" && state) {
+        showPlayerAlert("CRITICAL: CONTAINMENT BREACH LOCKDOWN ENGAGED ACROSS ALL DECKS!");
+        logWardenEvent("Station-wide Containment Lockdown activated.", "danger");
+      }
+
+      renderAll();
+    }
+
+    function adjustStress(delta) {
+      scenario.stress = Math.max(0, scenario.stress + delta);
+      logWardenEvent(`Party Stress ${delta > 0 ? 'increased' : 'reduced'} to ${scenario.stress}`, delta > 0 ? "warn" : "info");
+      renderAll();
+    }
+
+    function triggerHunterAmbush() {
+      scenario.hunterNodeId = scenario.partyNodeId;
+      scenario.stress += 1;
+      const current = scenario.nodes.find(n => n.id === scenario.partyNodeId);
+      injectTerminalEffect("glitch");
+      showPlayerAlert(`AMBUSH! THE HUNTER REAPER DROPS FROM THE VENTS INTO [${current.level}] ${current.name.toUpperCase()}! (+1 STRESS)`);
+      logWardenEvent(`HUNTER AMBUSH triggered in [${current.level}] ${current.name}!`, "danger");
+      renderAll();
+    }
+
+    function injectTerminalEffect(type) {
+      const playerView = document.getElementById("playerView");
+      if (type === "glitch") {
+        playerView.classList.add("glitch-active");
+        setTimeout(() => playerView.classList.remove("glitch-active"), 900);
+        logWardenEvent("Injected CRT visual glitch to Player Terminal.", "cyan");
+      } else if (type === "audio") {
+        showPlayerAlert("ACOUSTIC SENSOR: METALLIC CLAWS SCRAPING INSIDE OVERHEAD DUCTING...");
+        logWardenEvent("Pushed overhead vent audio cue.", "warn");
+      } else if (type === "broadcast") {
+        stepClock("clock_upload", 10);
+        showPlayerAlert("MIND-CORE CARRIER WAVE SPIKE: POLYMORPHIC VIRUS PACKETS TRANSMITTING TO LEVEL 09.");
+      }
+    }
+
+    function sendCustomAlert() {
+      const input = document.getElementById("customBroadcastInput");
+      const msg = input.value.trim();
+      if (!msg) return;
+      showPlayerAlert(msg.toUpperCase());
+      logWardenEvent(`Custom alert sent: "${msg}"`, "cyan");
+      input.value = "";
+    }
+
+    function forceLevel10Ultimatum() {
+      const uploadClock = scenario.clocks.find(c => c.id === "clock_upload");
+      const pct = uploadClock ? Math.max(98, uploadClock.current) : 99;
+      document.getElementById("ultimatumUploadPct").textContent = `${pct}%`;
+      document.getElementById("ultimatumOutcomeBox").classList.add("hidden");
+      document.getElementById("ultimatumChoices").classList.remove("hidden");
+      document.getElementById("ultimatumModal").classList.remove("hidden");
+      logWardenEvent("PUSHED LEVEL 10 ULTIMATUM TO PLAYER TERMINAL.", "danger");
+    }
+
+    // =========================================================================
+    // PLAYER TERMINAL PREVIEW & SIMULATION LOGIC
+    // =========================================================================
+    function renderPlayerTerminal() {
+      const currentNode = scenario.nodes.find(n => n.id === scenario.partyNodeId) || scenario.nodes[0];
+      document.getElementById("playerStationHeader").textContent = `${scenario.title.toUpperCase()} // CREW INTERFACE`;
+      document.getElementById("playerLocationSubtitle").textContent = `CURRENT NODE: [${currentNode.level}] ${currentNode.name.toUpperCase()}`;
+      document.getElementById("playerStressValue").textContent = scenario.stress;
+
+      // Grid state badge
+      const stateBadge = document.getElementById("playerStateBadge");
+      if (scenario.worldFlags.lockdown) {
+        stateBadge.textContent = "ALERT: LOCKDOWN";
+        stateBadge.className = "px-2.5 py-1 border border-red-500 bg-red-950/60 text-red-300 font-bold animate-pulse";
+      } else if (scenario.worldFlags.zpmInstalled) {
+        stateBadge.textContent = "GRID: ZPM SURGE";
+        stateBadge.className = "px-2.5 py-1 border border-amber-400 bg-amber-950/50 text-amber-300 font-bold";
+      } else {
+        stateBadge.textContent = "GRID: AUXILIARY";
+        stateBadge.className = "px-2.5 py-1 border border-cyan-500/40 bg-cyan-950/30 text-cyan-300 font-bold";
+      }
+
+      // Clocks HUD
+      const hud = document.getElementById("playerClocksHud");
+      hud.innerHTML = scenario.clocks.map(c => {
+        const isHigh = (c.current / c.max) >= 0.75;
+        return `
+          <div class="px-2.5 py-1 border ${isHigh ? 'border-red-500/70 bg-red-950/30' : 'border-slate-700 bg-black/60'} text-xs">
+            <span class="text-slate-400">${escapeHtml(c.label)}:</span>
+            <span class="font-bold ${isHigh ? 'text-red-400' : 'text-amber-300'} ml-1">${c.current}${c.unit === '%' ? '%' : '/' + c.max}</span>
+          </div>
+        `;
+      }).join("");
+
+      renderPlayerMap();
+      renderPlayerInventory();
+      renderPlayerRoomDetail(currentNode);
+    }
+
+    function renderPlayerMap() {
+      const svg = document.getElementById("playerConnectionsSvg");
+      const layer = document.getElementById("playerNodesLayer");
+      svg.innerHTML = "";
+      layer.innerHTML = "";
+
+      const currentNode = scenario.nodes.find(n => n.id === scenario.partyNodeId) || scenario.nodes[0];
+      const reachableIds = new Set(currentNode.connections || []);
+
+      const drawnPairs = new Set();
+      scenario.nodes.forEach(node => {
+        (node.connections || []).forEach(targetId => {
+          const target = scenario.nodes.find(n => n.id === targetId);
+          if (!target) return;
+          const pairKey = [node.id, target.id].sort().join("--");
+          if (drawnPairs.has(pairKey)) return;
+          drawnPairs.add(pairKey);
+
+          const isActivePath = node.id === currentNode.id || target.id === currentNode.id;
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", node.x + 75);
+          line.setAttribute("y1", node.y + 32);
+          line.setAttribute("x2", target.x + 75);
+          line.setAttribute("y2", target.y + 32);
+          line.setAttribute("stroke", isActivePath ? "#00e5ff" : "#273240");
+          line.setAttribute("stroke-width", isActivePath ? "2.5" : "1.5");
+          line.setAttribute("stroke-dasharray", node.isLocked || target.isLocked ? "5,4" : "none");
+          svg.appendChild(line);
+        });
+      });
+
+      scenario.nodes.forEach(node => {
+        const isCurrent = node.id === currentNode.id;
+        const isReachable = reachableIds.has(node.id);
+
+        const el = document.createElement("button");
+        el.style.left = `${node.x}px`;
+        el.style.top = `${node.y}px`;
+        el.className = `absolute w-[150px] p-2 text-left border transition ${
+          isCurrent
+            ? "bg-emerald-950/70 border-emerald-400 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.4)] z-20"
+            : isReachable
+            ? node.isLocked
+              ? "bg-red-950/40 border-red-500 text-red-200 hover:bg-red-900/50 cursor-pointer z-10"
+              : "bg-cyan-950/35 border-cyan-400 text-cyan-200 hover:bg-cyan-900/40 cursor-pointer z-10"
+            : "bg-[#0c1016]/90 border-slate-800 text-slate-500 cursor-not-allowed opacity-75"
+        }`;
+
+        el.innerHTML = `
+          <div class="flex items-center justify-between text-[10px] font-bold">
+            <span>[${escapeHtml(node.level)}]</span>
+            <span>${isCurrent ? "● CREW" : node.isLocked ? "🔒 LOCKED" : isReachable ? "TRANSIT →" : node.status}</span>
+          </div>
+          <div class="text-[11px] font-bold truncate mt-0.5">${escapeHtml(node.name)}</div>
+        `;
+
+        if (isReachable && !isCurrent) {
+          el.onclick = () => initiatePlayerMove(node.id);
+        }
+
+        layer.appendChild(el);
+      });
+    }
+
+    function renderPlayerInventory() {
+      const bar = document.getElementById("playerInventoryBar");
+      const encBadge = document.getElementById("encumbranceBadge");
+      const hasHeavy = scenario.inventory.some(it => it.isHeavy);
+      encBadge.classList.toggle("hidden", !hasHeavy);
+
+      if (scenario.inventory.length === 0) {
+        bar.innerHTML = `<span class="text-xs text-slate-500 italic">No keycards or hardware modules collected yet.</span>`;
+        return;
+      }
+
+      bar.innerHTML = scenario.inventory.map(item => {
+        const canInstallHere = item.installTargetNodeId && item.installTargetNodeId === scenario.partyNodeId;
+        return `
+          <div class="flex items-center gap-2 px-2.5 py-1 border ${item.isHeavy ? 'border-amber-400 bg-amber-950/50 text-amber-200' : 'border-cyan-500/60 bg-cyan-950/30 text-cyan-200'} text-xs font-bold">
+            <span>${escapeHtml(item.name)}</span>
+            ${canInstallHere ? `<button onclick="installZpmItem('${item.id}')" class="px-2 py-0.5 bg-amber-400 text-black text-[10px] font-extrabold animate-pulse">INSTALL IN CONSOLE</button>` : ""}
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderPlayerRoomDetail(node) {
+      const panel = document.getElementById("playerRoomDetailPanel");
+
+      // Ambient Virus Worker Reaper warning if awakened
+      let virusBanner = "";
+      if (scenario.worldFlags.virusAwakened && node.id !== "node_01" && node.id !== "node_09") {
+        virusBanner = scenario.worldFlags.workersProvoked
+          ? `<div class="p-2.5 border border-red-500 bg-red-950/50 text-red-200 text-xs font-bold">⚠ HOSTILE REAPER SWARM: BIO-MECHANICAL WORKERS IN THIS SECTOR ARE ATTACKING ON SIGHT!</div>`
+          : `<div class="p-2.5 border border-amber-500/60 bg-amber-950/30 text-amber-200 text-xs">
+               <span class="font-bold">⚙ VIRUS PROTOCOL ACTIVE:</span> Bio-mechanical statues have powered on and are welding bulkheads. They ignore the crew unless shot at, bumped, or obstructed.
+             </div>`;
+      }
+
+      // Level 10 Final Override Button
+      let level10Trigger = "";
+      if (node.id === "node_10" && !node.isLocked) {
+        level10Trigger = `
+          <div class="p-3 border-2 border-red-500 bg-red-950/30 space-y-2 pulse-crimson">
+            <div class="font-display text-sm font-bold text-red-400">MASTER SHUTTLE & CORE CONSOLE READY</div>
+            <p class="text-xs text-slate-300">Execute final station protocol before the Level 09 broadcast completes.</p>
+            <button onclick="forceLevel10Ultimatum()" class="btn-crimson w-full py-2 font-bold text-xs tracking-wider">
+              ACCESS FINAL LAUNCH / SELF-DESTRUCT TERMINAL
+            </button>
+          </div>
+        `;
+      }
+
+      panel.innerHTML = `
+        <div class="border-b border-amber-500/30 pb-3">
+          <div class="flex items-center justify-between text-xs text-cyan-400 font-bold">
+            <span>SECTOR [${escapeHtml(node.level)}]</span>
+            <span>STATUS: ${escapeHtml(node.status)}</span>
+          </div>
+          <h2 class="font-display text-xl font-bold text-amber-400 glow-amber mt-1">${escapeHtml(node.name.toUpperCase())}</h2>
+          <p class="text-xs text-slate-300 leading-relaxed mt-2">${escapeHtml(node.description)}</p>
+        </div>
+
+        ${virusBanner}
+        ${level10Trigger}
+
+        <!-- Recoverable Items / Keycards -->
+        <div class="space-y-2">
+          <div class="font-display text-xs font-bold text-emerald-400 tracking-wider">DETECTED HARDWARE & KEYCARDS</div>
+          ${(node.items && node.items.length > 0)
+            ? node.items.map(it => `
+                <div class="p-2.5 border border-emerald-500/40 bg-emerald-950/20 flex items-center justify-between gap-2">
+                  <div>
+                    <div class="text-xs font-bold text-emerald-300">${escapeHtml(it.name)}</div>
+                    ${it.isHeavy ? `<div class="text-[10px] text-amber-400">WARNING: HEAVY CONTAINMENT MODULE (+15% NOISE RISK)</div>` : ""}
+                  </div>
+                  <button onclick="collectRoomItem('${node.id}', '${it.id}')" class="btn-cyan px-3 py-1 text-xs font-bold">
+                    TAKE ITEM
+                  </button>
+                </div>
+              `).join("")
+            : `<div class="text-xs text-slate-500 italic">No loose keycards or modules detected in this compartment.</div>`
+          }
+        </div>
+
+        <!-- Local Terminal Files & Dossiers -->
+        <div class="space-y-2">
+          <div class="font-display text-xs font-bold text-amber-400 tracking-wider">LOCAL TERMINAL ARCHIVES (${(node.logs || []).length})</div>
+          ${(node.logs && node.logs.length > 0)
+            ? node.logs.map(log => `
+                <button onclick="openLogReader('${node.id}', '${log.id}')" class="w-full p-2.5 border border-amber-500/30 bg-black/60 hover:border-amber-400 text-left flex items-center justify-between transition">
+                  <div>
+                    <div class="text-xs font-bold text-amber-300">${escapeHtml(log.title)}</div>
+                    <div class="text-[10px] text-slate-400">SOURCE: ${escapeHtml(log.author || 'STATION BUS')}</div>
+                  </div>
+                  <span class="text-[11px] text-cyan-400 font-bold">[ READ FILE ]</span>
+                </button>
+              `).join("")
+            : `<div class="text-xs text-slate-500 italic">No readable data logs on local node.</div>`
+          }
+        </div>
+      `;
+    }
+
+    // =========================================================================
+    // PLAYER INTERACTIONS: KEYPADS, TRANSIT PACE, ITEMS, & ULTIMATUM
+    // =========================================================================
+    function initiatePlayerMove(targetNodeId) {
+      const target = scenario.nodes.find(n => n.id === targetNodeId);
+      if (!target) return;
+
+      // Check Lock Status First
+      if (target.isLocked) {
+        openKeypadModal(target);
+        return;
+      }
+
+      // Open Time vs. Noise Transit Pace Modal
+      pendingTransitNodeId = targetNodeId;
+      const hasHeavy = scenario.inventory.some(i => i.isHeavy);
+      const effectiveRisk = Math.min(95, (target.rushedRisk || 25) + (hasHeavy ? 15 : 0));
+
+      document.getElementById("transitTargetTitle").textContent = `TRANSIT TO [${target.level}] ${target.name.toUpperCase()}`;
+      document.getElementById("cautiousCostLabel").textContent = scenario.worldFlags.zpmInstalled
+        ? `+10% Comms Upload & +${target.cautiousTick} Time Tick`
+        : `+${target.cautiousTick} Auxiliary Time Tick (Zero Noise)`;
+      document.getElementById("rushedRiskLabel").textContent = `${effectiveRisk}% Acoustic / Ambush Risk${hasHeavy ? ' (ZPM Penalty)' : ''}`;
+
+      document.getElementById("transitModal").classList.remove("hidden");
+    }
+
+    function resolveTransit(pace) {
+      closeModal("transitModal");
+      const target = scenario.nodes.find(n => n.id === pendingTransitNodeId);
+      if (!target) return;
+
+      scenario.partyNodeId = target.id;
+      const hasHeavy = scenario.inventory.some(i => i.isHeavy);
+
+      if (pace === "cautious") {
+        // Advance Auxiliary clock
+        const auxClock = scenario.clocks.find(c => c.id === "clock_aux");
+        if (auxClock) auxClock.current = Math.min(auxClock.max, auxClock.current + (target.cautiousTick || 1));
+
+        // If ZPM is installed, advancing cautiously ticks up the 09 Comms Broadcast Upload!
+        if (scenario.worldFlags.zpmInstalled) {
+          const upClock = scenario.clocks.find(c => c.id === "clock_upload");
+          if (upClock) upClock.current = Math.min(upClock.max, upClock.current + 10);
+        }
+
+        logWardenEvent(`Crew moved CAUTIOUSLY to [${target.level}] ${target.name}. Clocks ticked.`, "cyan");
+      } else {
+        // Rushed: Roll against noise risk
+        const risk = Math.min(95, (target.rushedRisk || 25) + (hasHeavy ? 15 : 0));
+        const roll = Math.floor(Math.random() * 100) + 1;
+
+        if (roll <= risk) {
+          scenario.hunterNodeId = target.id;
+          scenario.stress += 1;
+          injectTerminalEffect("glitch");
+          if (scenario.worldFlags.virusAwakened) {
+            showPlayerAlert(`ACOUSTIC SPIKE (ROLLED ${roll} <= ${risk}%)! YOU CLIPPED A CONDUIT—THE HUNTER REAPER CLOSES IN AND WORKER UNITS TURN THEIR HEADS!`);
+          } else {
+            showPlayerAlert(`ACOUSTIC SPIKE (ROLLED ${roll} <= ${risk}%)! ECHOES DOWN THE SHAFT—THE ACTIVE HUNTER REAPER INTERCEPTS YOU IN [${target.level}]!`);
+          }
+          logWardenEvent(`RUSHED MOVE FAILED (Roll ${roll} <= ${risk}%): Hunter Reaper intercepted crew at [${target.level}]!`, "danger");
+        } else {
+          showPlayerAlert(`RAPID TRANSIT CLEAR (ROLLED ${roll} > ${risk}%): SLIPPED PAST BULKHEAD UNDETECTED.`);
+          logWardenEvent(`Rushed move to [${target.level}] succeeded (Roll ${roll} > ${risk}%).`, "info");
+        }
+      }
+
+      // Check if Hunter happens to already be in the target room
+      if (scenario.hunterNodeId === target.id) {
+        showPlayerAlert(`PROXIMITY WARNING: APEX HUNTER REAPER DETECTED IN [${target.level}] ${target.name.toUpperCase()}!`);
+      }
+
+      pendingTransitNodeId = null;
+      renderAll();
+    }
+
+    function openKeypadModal(node) {
+      pendingKeypadNodeId = node.id;
+      currentKeypadDigits = "";
+      document.getElementById("keypadRoomTitle").textContent = `[${node.level}] ${node.name.toUpperCase()}`;
+      document.getElementById("keypadCodeDisplay").textContent = "----";
+      document.getElementById("keypadFeedbackMsg").textContent = "";
+
+      const reqBox = document.getElementById("keypadRequirementStatus");
+      if (node.requiredItemId === "FLAG_CORE_UNLOCKED") {
+        reqBox.innerHTML = `<span class="text-amber-300 font-bold">BLAST SEALED:</span> Requires Sovereign Engine (ZPM) installed in [07] Main Engineering.`;
+      } else if (node.requiredItemId) {
+        const hasCard = scenario.inventory.some(i => i.id === node.requiredItemId);
+        reqBox.innerHTML = hasCard
+          ? `<span class="text-emerald-400 font-bold">✓ KEYCARD DETECTED IN INVENTORY.</span> Enter 4-digit PIN.`
+          : `<span class="text-red-400 font-bold">✕ MISSING PHYSICAL KEYCARD</span> (Enter override code if known).`;
+      } else {
+        reqBox.innerHTML = `<span class="text-cyan-300">KEYPAD LOCKED:</span> Enter 4-digit access PIN.`;
+      }
+
+      document.getElementById("keypadModal").classList.remove("hidden");
+    }
+
+    function pressKeypadDigit(d) {
+      if (currentKeypadDigits.length >= 4) return;
+      currentKeypadDigits += d;
+      document.getElementById("keypadCodeDisplay").textContent = currentKeypadDigits.padEnd(4, "-");
+    }
+
+    function clearKeypadDigits() {
+      currentKeypadDigits = "";
+      document.getElementById("keypadCodeDisplay").textContent = "----";
+      document.getElementById("keypadFeedbackMsg").textContent = "";
+    }
+
+    function submitKeypadCode() {
+      const node = scenario.nodes.find(n => n.id === pendingKeypadNodeId);
+      if (!node) return;
+      const msg = document.getElementById("keypadFeedbackMsg");
+
+      if (node.requiredItemId === "FLAG_CORE_UNLOCKED" && !scenario.worldFlags.coreUnlocked) {
+        msg.className = "text-xs text-center font-bold text-red-400";
+        msg.textContent = "ACCESS DENIED: NO MAIN BUS POWER FROM [07].";
+        return;
+      }
+
+      if (currentKeypadDigits === String(node.keypadCode)) {
+        node.isLocked = false;
+        node.status = "ONLINE";
+        msg.className = "text-xs text-center font-bold text-emerald-400";
+        msg.textContent = "ACCESS GRANTED // BULKHEAD UNSEALED";
+        logWardenEvent(`Crew unlocked [${node.level}] ${node.name} via keypad.`, "cyan");
+
+        setTimeout(() => {
+          closeModal("keypadModal");
+          renderAll();
+          initiatePlayerMove(node.id);
+        }, 450);
+      } else {
+        msg.className = "text-xs text-center font-bold text-red-400";
+        msg.textContent = "INVALID ACCESS CODE";
+        currentKeypadDigits = "";
+        document.getElementById("keypadCodeDisplay").textContent = "----";
+      }
+    }
+
+    function collectRoomItem(nodeId, itemId) {
+      const node = scenario.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      const idx = node.items.findIndex(i => i.id === itemId);
+      if (idx === -1) return;
+
+      const [item] = node.items.splice(idx, 1);
+      scenario.inventory.push(item);
+      logWardenEvent(`Crew acquired item: ${item.name}`, "cyan");
+
+      // In Beacon 3A-R3D, grabbing the 10 Keycard from 07B triggers Containment Lockdown!
+      if (item.id === "item_key_10") {
+        scenario.worldFlags.lockdown = true;
+        showPlayerAlert("CRITICAL: CONTAINMENT BREACH! 10 ESCAPE KEYCARD REMOVED—BLAST SHUTTERS DROPPING! SPRINT TO LEVEL 10!");
+        logWardenEvent("10 Keycard taken! Containment Lockdown triggered.", "danger");
+      }
+
+      renderAll();
+    }
+
+    function installZpmItem(itemId) {
+      const idx = scenario.inventory.findIndex(i => i.id === itemId);
+      if (idx === -1) return;
+      const [item] = scenario.inventory.splice(idx, 1);
+      logWardenEvent(`Crew installed ${item.name} into Engineering housing!`, "danger");
+      toggleWorldFlag("zpmInstalled", true);
+    }
+
+    function openLogReader(nodeId, logId) {
+      const node = scenario.nodes.find(n => n.id === nodeId);
+      const log = node?.logs.find(l => l.id === logId);
+      if (!log) return;
+
+      document.getElementById("logReaderTitle").textContent = log.title;
+      document.getElementById("logReaderMeta").textContent = `NODE [${node.level}] // SOURCE: ${log.author || 'UNKNOWN'}`;
+      document.getElementById("logReaderBody").textContent = log.body;
+
+      const stressNote = document.getElementById("logReaderStressNote");
+      if (log.stress && log.stress > 0) {
+        stressNote.textContent = `WARDEN NOTE: READING THIS FILE TRIGGERS +${log.stress} STRESS.`;
+      } else {
+        stressNote.textContent = "";
+      }
+
+      document.getElementById("logReaderModal").classList.remove("hidden");
+      logWardenEvent(`Crew accessed log: ${log.title}`, "info");
+    }
+
+    function resolveUltimatum(choice) {
+      const box = document.getElementById("ultimatumOutcomeBox");
+      const choices = document.getElementById("ultimatumChoices");
+      choices.classList.add("hidden");
+      box.classList.remove("hidden");
+
+      if (choice === "escape") {
+        const upClock = scenario.clocks.find(c => c.id === "clock_upload");
+        if (upClock) upClock.current = 100;
+        box.className = "p-4 border border-amber-400 bg-amber-950/40 text-amber-100 text-xs sm:text-sm leading-relaxed space-y-2";
+        box.innerHTML = `
+          <div class="font-display text-base font-bold text-amber-400">ENDING A: SURVIVAL AT ANY COST</div>
+          <p>The shuttle clamps shear free and thrusters ignite, blasting clear of Beacon 3A-R3D just as the active Reaper slams against the inner airlock glass.</p>
+          <p>As you dock with <em>The Endless Waltz</em>, your long-range comms console lights up—relaying a self-replicating sub-space carrier wave bouncing from buoy to buoy toward human space. <strong>You lived. Humanity just caught the infection.</strong></p>
+        `;
+        logWardenEvent("ENDING CHOSEN: [ ESCAPE ] — Crew survived, broadcast hit 100%.", "warn");
+      } else {
+        box.className = "p-4 border border-red-500 bg-red-950/50 text-red-100 text-xs sm:text-sm leading-relaxed space-y-2";
+        box.innerHTML = `
+          <div class="font-display text-base font-bold text-red-400">ENDING B: SILENT ANNIHILATION</div>
+          <p>Instead of releasing the launch clamps, you override the Sovereign Engine's magnetic containment and dump every ounce of zero-point vacuum energy straight back into the station core.</p>
+          <p>The Level 09 broadcast cuts dead at <strong>99.9%</strong> as Beacon 3A-R3D implodes in a silent flash of blue-white light. The Mind-Core, the Reapers, and the entire crew are instantly vaporized. <strong>Humanity never even knows how close it came to extinction.</strong></p>
+        `;
+        logWardenEvent("ENDING CHOSEN: [ SELF-DESTRUCT ] — Total annihilation, humanity saved.", "danger");
+      }
+      renderAll();
+    }
+
+    function showPlayerAlert(text) {
+      const banner = document.getElementById("playerAlertBanner");
+      document.getElementById("playerAlertText").textContent = text;
+      banner.classList.remove("hidden");
+    }
+
+    function dismissPlayerAlert() {
+      document.getElementById("playerAlertBanner").classList.add("hidden");
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add("hidden");
+    }
+
+    // =========================================================================
+    // JSON EXPORT / IMPORT / RESET
+    // =========================================================================
+    function exportScenarioJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(scenario, null, 2));
+      const a = document.createElement("a");
+      a.setAttribute("href", dataStr);
+      const slug = (scenario.title || "scenario").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      a.setAttribute("download", `${slug}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      logWardenEvent("Exported scenario JSON file.", "cyan");
+    }
+
+    function importScenarioJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          BUILDER_VALIDATION.scenario(parsed);
+          if (!projectStorage.confirmImport()) return;
+          scenario = parsed;
+          selectedNodeId = scenario.nodes[0].id;
+          logWardenEvent(`Imported scenario: ${scenario.title}`, "cyan");
+          renderAll();
+        } catch (err) {
+          projectStorage.error("Import failed: " + err.message);
+        }
+      };
+      reader.onerror = () => projectStorage.error("Import failed: could not read the file.");
+      reader.readAsText(file);
+      event.target.value = "";
+    }
+
+    function openResetConfirm() {
+      document.getElementById("resetConfirmModal").classList.remove("hidden");
+    }
+
+    function resetToDefaultScenario() {
+      scenario = createDefaultScenario();
+      selectedNodeId = scenario.nodes[0].id;
+      closeModal("resetConfirmModal");
+      logWardenEvent("Scenario reset to default 'Incident at Beacon 3A-R3D'.", "warn");
+      renderAll();
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // Boot Application
+    window.onload = () => {
+      logWardenEvent("WARDEN//OS initialized. Loaded 'Incident at Beacon 3A-R3D'.", "cyan");
+      setMode("builder");
+    };
+  </script>
+</body>
+</html>
