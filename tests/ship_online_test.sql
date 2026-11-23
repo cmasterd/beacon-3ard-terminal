@@ -13,12 +13,15 @@ select set_config('request.jwt.claim.sub', '', true);
 set local role anon;
 select public.beacon_request_ship_item(repeat('b', 64), 2, 'up_armor', 2, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 0);
 select public.beacon_request_ship_item(repeat('b', 64), 2, 'up_armor', 2, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 0);
+select public.beacon_request_action(repeat('b', 64), 2, '2', 'explore', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 0);
 do $$
 declare data jsonb;
 begin
     data := public.beacon_read_session(repeat('b', 64), 1);
     if data #>> '{ship,name}' <> 'Test Ship' or jsonb_array_length(data -> 'ship_requests') <> 1
-        or data #>> '{ship_requests,0,group}' <> '2' or data #>> '{ship_requests,0,status}' <> 'pending' then
+        or data #>> '{ship_requests,0,group}' <> '2' or data #>> '{ship_requests,0,status}' <> 'pending'
+        or data #>> '{action_requests,0,status}' <> 'pending'
+        or data #>> '{shared,vad_shared_station_state_v14,2,explored}' <> 'false' then
         raise exception 'request not shared: %', data;
     end if;
     begin
@@ -56,6 +59,7 @@ select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111112
 set local role authenticated;
 select public.beacon_decide_ship_request(repeat('b', 64), 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'approved', 0);
 select public.beacon_decide_ship_request(repeat('b', 64), 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'rejected', 0);
+select public.beacon_decide_action(repeat('b', 64), 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', true, 0);
 do $$
 declare data jsonb;
 begin
@@ -64,7 +68,9 @@ begin
             where r ->> 'id' = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' and r ->> 'status' = 'approved')
         or not exists (select 1 from jsonb_array_elements(data -> 'ship_requests') r
             where r ->> 'id' = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' and r ->> 'status' = 'rejected')
-        or data #>> '{ship,name}' <> 'Test Ship' then
+        or data #>> '{ship,name}' <> 'Test Ship'
+        or data #>> '{action_requests,0,status}' <> 'approved'
+        or data #>> '{shared,vad_shared_station_state_v14,2,explored}' <> 'true' then
         raise exception 'approval should not change ship: %', data;
     end if;
     begin
@@ -77,7 +83,8 @@ do $$
 declare data jsonb;
 begin
     data := public.beacon_read_session(repeat('b', 64), null);
-    if data #>> '{ship,name}' <> 'Test Ship' or jsonb_array_length(data -> 'ship_requests') <> 2 then
+    if data #>> '{ship,name}' <> 'Test Ship' or jsonb_array_length(data -> 'ship_requests') <> 2
+        or jsonb_array_length(data -> 'action_requests') <> 0 then
         raise exception 'reset lost ship or requests: %', data;
     end if;
     begin

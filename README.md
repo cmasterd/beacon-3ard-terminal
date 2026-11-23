@@ -36,6 +36,14 @@ All log content (titles, descriptions, file paths, text bodies, `public` flags) 
 
 In local mode the pages share scenario progress through the browser's `localStorage`. Open them in the same browser and serve them from the same origin. Online mode can also synchronize an independent session across devices through Supabase.
 
+## Player action approvals
+
+Selecting a sector is unrestricted, but **Explore**, **Search**, and **Access Logs** send a request to the Warden in both local and online games. The Warden sees pending requests in **Player Action Requests** and can approve or reject each one. Approval immediately applies the action; rejection leaves progress unchanged and the player can request it again. The player terminal shows the latest request for the current sector, including the requesting group online. Only one equivalent request can be pending at a time. If an action becomes unavailable before approval, the Warden can reject the stale request.
+
+Sector 7B still requires engine power or the Warden's visibility override, but plugging in the engine no longer automatically explores it: exploration also requires approval. These sector actions are separate from the Warden's archive unlock controls.
+
+For local approval, use a browser with Web Locks support and a secure origin such as `localhost` or HTTPS. Both terminals must use the same browser profile and origin; local mode is not a security boundary. Online approval works across devices and browsers using the shared session. A reset or backup restore clears the request queue, so players must submit new requests afterward. Backups do not include request history. If a submission cannot be confirmed, keep its tab open and use **Retry** or **Discard** after checking its status.
+
 ## Online sessions and split groups
 
 The Warden signs in through **Online Warden Login** in the Warden Overwatch tile using the account created in the Supabase project. Share the player link or session code with everyone, including the shared table touchscreen. Players can enter the code in the Player Briefing tile to join. After a successful connection the browser remembers that session, so opening the online player terminal again needs no code; enter a new one to switch sessions or use **Forget Saved Session** to remove it. Local player and Warden terminals remain available from the same tiles.
@@ -56,6 +64,8 @@ The five-character session code and player link grant access: share them only wi
 4. Open the gateway, select **Game Library → Beacon 3A-R3D → Online Warden Login**, sign in, and share the player link or session code. Enable additional groups as needed. The online station starts separately from local progress; use Backup & Restore to import an existing local backup if desired.
 
 An internet connection is required. Supabase can pause an inactive free project; restore it from its dashboard before play if needed. The Warden's **Exit Online Session** signs out on that browser. Each Warden account has one persistent online station.
+
+When deploying action approvals, update the schema and the player and Warden pages together. Older player pages are not compatible with the approval-enforcing schema; the new pages require the updated schema.
 
 ## Run locally
 
