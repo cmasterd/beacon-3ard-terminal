@@ -123,9 +123,107 @@ begin
 end;
 $$;
 
+-- Draft packages are private, immutable snapshots. A draft is not a published game.
+create or replace function public.game_save_draft(p_game_id uuid, p_version_id uuid, p_expected_version integer, p_package jsonb)
+returns jsonb language plpgsql security definer
+set search_path = pg_catalog, beacon_private
+as $$
+declare
+    game_row beacon_private.games%rowtype;
+    existing beacon_private.game_versions%rowtype;
+    current_version integer;
+    draft_title text;
+    draft_description text;
+begin
+    if auth.uid() is null then raise exception 'Warden login required' using errcode = '42501'; end if;
+    if p_game_id is null or p_version_id is null or p_expected_version is null or p_expected_version < 0
+        or p_package is null or jsonb_typeof(p_package) is distinct from 'object'
+        or octet_length(p_package::text) > 1048576
+        or jsonb_typeof(p_package -> 'catalog') is distinct from 'object'
+        or jsonb_typeof(p_package #> '{catalog,title}') is distinct from 'string'
+        or jsonb_typeof(p_package #> '{catalog,description}') is distinct from 'string'
+        or jsonb_typeof(p_package -> 'definition') is distinct from 'object'
+        or p_package #>> '{definition,format}' is distinct from 'vad-scenario'
+        or p_package #> '{definition,version}' is distinct from '1'::jsonb
+        or jsonb_typeof(p_package #> '{definition,initialState}') is distinct from 'object'
+        or jsonb_typeof(p_package #> '{definition,nodes}') is distinct from 'array'
+        or jsonb_array_length(p_package #> '{definition,nodes}') = 0 then
+        raise exception 'Invalid scenario package' using errcode = '22023';
+    end if;
+    draft_title := btrim(p_package #>> '{catalog,title}');
+    draft_description := p_package #>> '{catalog,description}';
+    if length(draft_title) not between 1 and 120 or length(draft_description) > 2000 then
+        raise exception 'Invalid catalog title or description' using errcode = '22023';
+    end if;
+
+    insert into beacon_private.games (id, owner_id, title, description, engine)
+    values (p_game_id, auth.uid(), draft_title, draft_description, 'scenario')
+    on conflict (id) do nothing;
+    select * into game_row from beacon_private.games where id = p_game_id for update;
+    if game_row.owner_id is distinct from auth.uid() or game_row.engine <> 'scenario' or game_row.published then
+        raise exception 'Private draft not found or unavailable' using errcode = '42501';
+    end if;
+    select * into existing from beacon_private.game_versions where id = p_version_id;
+    if found then
+        if existing.game_id is distinct from p_game_id or existing.version <> p_expected_version + 1
+            or existing.definition is distinct from p_package then
+            raise exception 'Version identifier already used' using errcode = '22023';
+        end if;
+        return jsonb_build_object('game_id', p_game_id, 'version_id', p_version_id, 'version', existing.version);
+    end if;
+    select coalesce(max(version), 0) into current_version from beacon_private.game_versions where game_id = p_game_id;
+    if current_version <> p_expected_version then
+        raise exception 'Draft changed in another tab; reload before saving' using errcode = '40001';
+    end if;
+    insert into beacon_private.game_versions (id, game_id, version, definition)
+    values (p_version_id, p_game_id, current_version + 1, p_package);
+    update beacon_private.games set title = draft_title, description = draft_description where id = p_game_id;
+    return jsonb_build_object('game_id', p_game_id, 'version_id', p_version_id, 'version', current_version + 1);
+end;
+$$;
+
+create or replace function public.game_list_my_drafts()
+returns jsonb language plpgsql stable security definer
+set search_path = pg_catalog, beacon_private
+as $$
+begin
+    if auth.uid() is null then raise exception 'Warden login required' using errcode = '42501'; end if;
+    return coalesce((select jsonb_agg(jsonb_build_object('id', g.id, 'title', g.title,
+        'description', g.description, 'version', v.version, 'version_id', v.id)
+        order by g.title, g.id)
+        from beacon_private.games g
+        join lateral (select id, version from beacon_private.game_versions
+            where game_id = g.id order by version desc limit 1) v on true
+        where g.owner_id = auth.uid() and g.engine = 'scenario' and not g.published), '[]'::jsonb);
+end;
+$$;
+
+create or replace function public.game_read_draft(p_game_id uuid)
+returns jsonb language plpgsql stable security definer
+set search_path = pg_catalog, beacon_private
+as $$
+declare result jsonb;
+begin
+    if auth.uid() is null then raise exception 'Warden login required' using errcode = '42501'; end if;
+    select jsonb_build_object('game_id', g.id, 'version_id', v.id, 'version', v.version, 'package', v.definition)
+    into result from beacon_private.games g
+    join lateral (select id, version, definition from beacon_private.game_versions
+        where game_id = g.id order by version desc limit 1) v on true
+    where g.id = p_game_id and g.owner_id = auth.uid() and g.engine = 'scenario' and not g.published;
+    if result is null then raise exception 'Private draft not found' using errcode = '42501'; end if;
+    return result;
+end;
+$$;
+
 revoke all on function public.game_list_published() from public;
 revoke all on function public.game_list_my_sessions() from public, anon;
+revoke all on function public.game_save_draft(uuid, uuid, integer, jsonb) from public, anon;
+revoke all on function public.game_list_my_drafts() from public, anon;
+revoke all on function public.game_read_draft(uuid) from public, anon;
 grant execute on function public.game_list_published() to anon, authenticated;
 grant execute on function public.game_list_my_sessions() to authenticated;
+grant execute on function public.game_save_draft(uuid, uuid, integer, jsonb) to authenticated;
+grant execute on function public.game_list_my_drafts() to authenticated;
+grant execute on function public.game_read_draft(uuid) to authenticated;
 
 commit;

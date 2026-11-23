@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PRIVATE SCENARIO DRAFTS // VAD NETWORK</title>
+    <link rel="stylesheet" href="gateway.css">
+</head>
+<body>
+    <header class="header">
+        <nav><a href="builders.html">← BUILDERS</a> / <a href="scenario-builder.html">SCENARIO BUILDER</a></nav>
+        <p class="eyebrow">VAD NETWORK // EXPERIMENTAL</p>
+        <h1>PRIVATE SCENARIO DRAFTS</h1>
+        <p>Save versioned game packages to your Warden account. Drafts are not published or playable.</p>
+    </header>
+    <main>
+        <p>Sign in using <a href="online.html">Online Warden Login</a>, then return here. This experimental feature requires the game-foundation migration in a test Supabase project.</p>
+        <p>Packages contain secrets. Only upload your own package and keep downloads private.</p>
+        <p id="draft-status" role="status" aria-live="polite"></p>
+        <section>
+            <h2>YOUR DRAFTS</h2>
+            <label for="draft-select">Choose a draft or create a new one</label>
+            <select id="draft-select"><option value="">NEW DRAFT</option></select>
+            <button type="button" id="draft-refresh">REFRESH LIST</button>
+            <button type="button" id="draft-download">DOWNLOAD LATEST PACKAGE</button>
+        </section>
+        <section>
+            <h2>SAVE PACKAGE</h2>
+            <label for="draft-file">Game package exported by Scenario Builder</label>
+            <input id="draft-file" type="file" accept=".json,application/json">
+            <p>Saving an existing draft creates a new immutable version from the selected file. The file's current simulation state becomes its starting state.</p>
+            <button type="button" id="draft-save">SAVE PRIVATE DRAFT</button>
+            <button type="button" id="draft-retry" hidden>RETRY UNCERTAIN SAVE</button>
+            <button type="button" id="draft-discard" hidden>DISCARD RETRY</button>
+        </section>
+    </main>
+    <script src="online.js"></script>
+    <script src="scenario-drafts.js"></script>
+</body>
+</html>
