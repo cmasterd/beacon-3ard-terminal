@@ -331,6 +331,8 @@
     <script src="online.js"></script>
     <script src="logs.js"></script>
     <script src="station.js"></script>
+    <script src="action-approval.js"></script>
+    <script src="warden-approvals.js"></script>
     <script>
         const STORAGE_KEY = 'vad_shared_station_state_v14';
 
@@ -786,11 +788,16 @@
                 } catch (error) { alert('Online reset failed: ' + error.message); }
                 return;
             }
-            resetAllState();
-            Object.values(ARCHIVE).forEach(cfg => { GAME_STORAGE.removeItem(cfg.key); GAME_STORAGE.removeItem(cfg.notifiedKey); });
-            [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY, STATION.LOG_KEY, 'vad_text_revealed_v1'].forEach(k => GAME_STORAGE.removeItem(k));
-            GAME_STORAGE.setItem(STATION.FOCUS_KEY, JSON.stringify({ room: '1', t: Date.now() }));
-            GAME_STORAGE.setItem(STATION.RESET_KEY, crypto.randomUUID());
+            try {
+                await ACTION_APPROVAL.withLock(() => {
+                    lastSerializedState = null;
+                    resetAllState();
+                    Object.values(ARCHIVE).forEach(cfg => { GAME_STORAGE.removeItem(cfg.key); GAME_STORAGE.removeItem(cfg.notifiedKey); });
+                    [BROADCAST_KEY, BROADCAST_SEEN_KEY, COUNTDOWN_KEY, STATION.HAZARD_KEY, STATION.STATUS_KEY, STATION.LOG_KEY, 'vad_text_revealed_v1', ACTION_APPROVAL.KEY].forEach(k => GAME_STORAGE.removeItem(k));
+                    GAME_STORAGE.setItem(STATION.FOCUS_KEY, JSON.stringify({ room: '1', t: Date.now() }));
+                    GAME_STORAGE.setItem(STATION.RESET_KEY, crypto.randomUUID());
+                });
+            } catch (error) { alert('Local reset failed: ' + error.message); return; }
             renderPlayerFocus();
             STATION.logEvent('WARDEN', 'Station reset');
             renderSessionLog();
@@ -1104,7 +1111,7 @@
         }
 
         // Backups cover every vad_ key except the per-device sound preference.
-        const BACKUP_SKIP = ['vad_sound_v1'];
+        const BACKUP_SKIP = ['vad_sound_v1', 'vad_action_requests_v1', 'vad_station_reset_v1'];
 
         function backupKeys() {
             return GAME_STORAGE.keys().filter(k => k.startsWith('vad_') && !BACKUP_SKIP.includes(k));
@@ -1150,8 +1157,12 @@
                 try {
                     if (GAME_STORAGE.online) await GAME_STORAGE.restore(entries);
                     else {
-                        backupKeys().forEach(k => GAME_STORAGE.removeItem(k));
-                        entries.forEach(([k, v]) => GAME_STORAGE.setItem(k, v));
+                        await ACTION_APPROVAL.withLock(() => {
+                            backupKeys().forEach(k => GAME_STORAGE.removeItem(k));
+                            entries.forEach(([k, v]) => GAME_STORAGE.setItem(k, v));
+                            GAME_STORAGE.removeItem(ACTION_APPROVAL.KEY);
+                            GAME_STORAGE.setItem(STATION.RESET_KEY, crypto.randomUUID());
+                        });
                     }
                     location.reload();
                 } catch (error) {
@@ -1355,6 +1366,7 @@
             catch (error) { BEACON_ONLINE.showStartupError(error); return; }
             init();
             setupOnlineGroups();
+            setupActionApprovals();
             if (GAME_STORAGE.online) {
                 let lastOnlineControls = '';
                 window.addEventListener('beacon-sync', () => {

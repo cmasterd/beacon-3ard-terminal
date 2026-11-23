@@ -265,6 +265,9 @@
                         <button id="btn-search" onclick="doSearch()" class="w-full py-3 bg-yellow-950 hover:bg-yellow-900 border border-yellow-500 text-yellow-300 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer">🔍 SEARCH ITEMS</button>
                         <button id="btn-log" onclick="doLog()" class="w-full py-3 bg-emerald-950 hover:bg-emerald-900 border border-emerald-500 text-emerald-300 font-orbitron text-xs md:text-sm font-bold rounded tracking-widest transition shadow-lg cursor-pointer">💻 ACCESS LOGS</button>
                     </div>
+                    <p id="action-request-status" class="text-sm text-amber-300" role="status" aria-live="polite"></p>
+                    <button id="action-request-retry" type="button" class="hidden px-3 py-2 border border-amber-500 text-amber-300">RETRY REQUEST</button>
+                    <button id="action-request-discard" type="button" class="hidden px-3 py-2 border border-red-500 text-red-300">DISCARD RETRY</button>
 
                     <button id="btn-pickup-engine" onclick="pickupEngine()" class="w-full py-3 bg-purple-950 hover:bg-purple-900 border border-purple-500 text-purple-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg hidden cursor-pointer animate-pulse">📦 PICK UP SOVEREIGN ENGINE</button>
                     <button id="btn-plug-engine" onclick="plugInEngine()" class="w-full py-3 bg-blue-950 hover:bg-blue-900 border border-blue-500 text-blue-200 font-orbitron text-sm font-bold rounded tracking-widest transition shadow-lg hidden cursor-pointer animate-pulse">⚡ PLUG SOVEREIGN ENGINE INTO MAIN POWER</button>
@@ -286,6 +289,7 @@
     <script src="online.js"></script>
     <script src="logs.js"></script>
     <script src="station.js"></script>
+    <script src="action-approval.js"></script>
     <script>
         const roomData = {
             1: { name: "01. DROPSHIP LANDING RIG", sub: "[DOCKING RIG]", env: "Mercenary transport docking collar.", loot: "Magnetic towing lines, hull repair patches.", logId: "VAD-BRIEF #01", log: "Standard corporate recovery protocol.", code: null },
@@ -343,6 +347,7 @@
                     renderPanelContent();
                 }
                 renderStatusStrip();
+                renderActionStatus();
             }, 800);
             setInterval(checkCountdown, 250);
         }
@@ -968,29 +973,61 @@
             }
         }
 
-        function doExplore() {
-            state[activeRoom].explored = true;
-            STATION.logEvent('PLAYER', `Explored sector ${activeRoom}`);
-            saveState();
-            updateGridVisuals();
-            selectRoom(activeRoom, false);
+        let pendingAction = null;
+        let sendingAction = false;
+        function renderActionStatus() {
+            if (pendingAction) return;
+            try {
+                const request = ACTION_APPROVAL.list().filter(r => r.room === String(activeRoom)).slice(-1)[0];
+                document.getElementById('action-request-status').textContent = request
+                    ? `${request.group ? `Group ${request.group}: ` : ''}${ACTION_APPROVAL.labels[request.action]} sector ${request.room}: ${request.status.toUpperCase()}.` : '';
+            } catch (error) {
+                document.getElementById('action-request-status').textContent = 'Request status unavailable: ' + error.message;
+            }
         }
-
-        function doSearch() {
-            state[activeRoom].searched = true;
-            STATION.logEvent('PLAYER', `Searched sector ${activeRoom}`);
-            saveState();
-            updateGridVisuals();
-            selectRoom(activeRoom, false);
+        async function sendAction() {
+            if (!pendingAction || sendingAction) return;
+            sendingAction = true;
+            const status = document.getElementById('action-request-status');
+            status.textContent = 'Sending request to Warden...';
+            try {
+                await ACTION_APPROVAL.submit(pendingAction);
+                status.textContent = `${ACTION_APPROVAL.labels[pendingAction.action]} sector ${pendingAction.room}: request sent to Warden.`;
+                pendingAction = null;
+            } catch (error) {
+                status.textContent = 'Could not confirm request: ' + error.message + '. Retry or discard after checking the request status.';
+            } finally {
+                sendingAction = false;
+                document.getElementById('action-request-retry').classList.toggle('hidden', !pendingAction);
+                document.getElementById('action-request-discard').classList.toggle('hidden', !pendingAction);
+            }
         }
-
-        function doLog() {
-            state[activeRoom].logUnlocked = true;
-            STATION.logEvent('PLAYER', `Accessed data log: sector ${activeRoom}`);
-            saveState();
-            updateGridVisuals();
-            selectRoom(activeRoom, false);
+        function requestAction(action) {
+            if (pendingAction) {
+                document.getElementById('action-request-status').textContent = 'Resolve the previous request retry first.';
+                return;
+            }
+            pendingAction = { id: crypto.randomUUID(), room: String(activeRoom), action,
+                group: GAME_STORAGE.online ? GAME_STORAGE.group : null,
+                epoch: GAME_STORAGE.online ? GAME_STORAGE.info.reset_epoch : localStorage.getItem(STATION.RESET_KEY) };
+            sendAction();
         }
+        function doExplore() { requestAction('explore'); }
+        function doSearch() { requestAction('search'); }
+        function doLog() { requestAction('log'); }
+        document.getElementById('action-request-retry').addEventListener('click', sendAction);
+        document.getElementById('action-request-discard').addEventListener('click', () => {
+            if (sendingAction || !confirm('The Warden may already have received this request. Discard the retry?')) return;
+            pendingAction = null;
+            document.getElementById('action-request-retry').classList.add('hidden');
+            document.getElementById('action-request-discard').classList.add('hidden');
+            document.getElementById('action-request-status').textContent = 'Retry discarded. Check the request status before sending again.';
+        });
+        window.addEventListener('beforeunload', event => {
+            if (!pendingAction) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
 
         function pickupEngine() {
             state[8].engineCollected = true;
@@ -1004,7 +1041,6 @@
         function plugInEngine() {
             if (!state['7b']) state['7b'] = {};
             state['7b'].enginePowered = true;
-            state['7b'].explored = true;
             saveState();
             const status = STATION.readStatus();
             status.power = 100;
@@ -1038,19 +1074,26 @@
             triggerEndgameScreen("STATION PURGE INITIATED", "You killed the mind-core and saved the human race. The Warden has taken over terminal control.", "error");
         }
 
-        function resetExploration() {
+        async function resetExploration() {
             if (GAME_STORAGE.online) {
                 alert('Online sessions can only be reset by the Warden.');
                 return;
             }
-            const permanentEnd = document.getElementById('permanent-end-screen');
-            permanentEnd.className = "fixed inset-0 bg-black/98 z-50 flex-col items-center justify-center p-6 border-8 backdrop-blur-lg hidden";
-            resetState();
-            const status = STATION.readStatus();
-            status.power = 0;
-            STATION.writeStatus(status);
-            updateGridVisuals();
-            selectRoom(1, true, false);
+            try {
+                await ACTION_APPROVAL.withLock(() => {
+                    const permanentEnd = document.getElementById('permanent-end-screen');
+                    permanentEnd.className = "fixed inset-0 bg-black/98 z-50 flex-col items-center justify-center p-6 border-8 backdrop-blur-lg hidden";
+                    lastSerializedState = null;
+                    resetState();
+                    const status = STATION.readStatus();
+                    status.power = 0;
+                    STATION.writeStatus(status);
+                    localStorage.removeItem(ACTION_APPROVAL.KEY);
+                    localStorage.setItem(STATION.RESET_KEY, crypto.randomUUID());
+                    updateGridVisuals();
+                    selectRoom(1, true, false);
+                });
+            } catch (error) { alert('Reset failed: ' + error.message); }
         }
 
         let onlineGroupButtons = '';

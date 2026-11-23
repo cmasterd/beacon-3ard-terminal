@@ -162,6 +162,17 @@
                     info.presence[config.group] = { room, time: Date.now() };
                     enqueue('beacon_focus', { ...params(), p_room: room });
                 } else {
+                    if (!config && key === ROOM_KEY && baseValue) {
+                        const current = localStorage.getItem(key);
+                        if (current) {
+                            const merged = JSON.parse(current);
+                            const changes = roomChanges(JSON.parse(baseValue), JSON.parse(value));
+                            Object.keys(changes).forEach(room => {
+                                merged[room] = { ...merged[room], ...changes[room] };
+                            });
+                            value = JSON.stringify(merged);
+                        }
+                    }
                     localStorage.setItem(localKey(key), value);
                 }
                 return;
@@ -218,6 +229,19 @@
         async setGroup(group, enabled) {
             await rpc('beacon_set_group', { p_code: config.code, p_group: group, p_enabled: enabled });
             await refresh();
+        },
+        async requestAction(room, action, id, epoch, group) {
+            if (!config || config.role !== 'player') throw new Error('Online player access required');
+            await this.syncNow();
+            if (info.reset_epoch !== epoch || config.group !== group) throw new Error('Session or group changed; discard this request');
+            await rpc('beacon_request_action', { ...params(), p_room: room, p_action: action, p_id: id, p_epoch: epoch });
+            await this.syncNow();
+        },
+        async decideAction(id, approve) {
+            if (!config || config.role !== 'warden') throw new Error('Warden access required');
+            await this.syncNow();
+            await rpc('beacon_decide_action', { p_code: config.code, p_id: id, p_approve: approve, p_epoch: info.reset_epoch });
+            await this.syncNow();
         },
         selectGroup(group) {
             if (!config || config.role !== 'player' || !info || !info.groups[group]) {

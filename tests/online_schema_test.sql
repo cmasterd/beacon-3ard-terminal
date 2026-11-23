@@ -73,12 +73,11 @@ begin
         raise exception 'anonymous user read private table';
     exception when insufficient_privilege then null; end;
 end $$;
-select public.beacon_update(current_setting('test.code'), 1, 'vad_shared_station_state_v14', '{"2":{"explored":true}}', 0);
-select public.beacon_update(current_setting('test.code'), 2, 'vad_shared_station_state_v14', '{"3":{"searched":true}}', 0);
 select public.beacon_update(current_setting('test.code'), 2, 'vad_ship_status_v1', '{"power":100}', 0);
 reset role;
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
 set local role authenticated;
+select public.beacon_update(current_setting('test.code'), null, 'vad_shared_station_state_v14', '{"2":{"explored":true},"3":{"searched":true}}', 0);
 select public.beacon_set_group(current_setting('test.code'), 3, true);
 select public.beacon_set_group(current_setting('test.code'), 4, true);
 reset role;
