@@ -13,6 +13,7 @@ create table if not exists beacon_private.sessions (
 );
 alter table beacon_private.sessions add column if not exists reset_epoch bigint not null default 0;
 alter table beacon_private.sessions add column if not exists player_code text;
+alter table beacon_private.sessions add column if not exists action_requests jsonb not null default '[]'::jsonb;
 create unique index if not exists beacon_sessions_player_code_idx on beacon_private.sessions (player_code);
 alter table beacon_private.sessions enable row level security;
 revoke all on all tables in schema beacon_private from public, anon, authenticated;
@@ -97,9 +98,104 @@ begin
     end if;
     return jsonb_build_object('shared', session_row.shared, 'groups', session_row.groups,
         'presence', session_row.presence,
+        'action_requests', session_row.action_requests,
         'private', case when is_owner then session_row.private_data else '{}'::jsonb end,
         'reset_epoch', session_row.reset_epoch,
         'server_time', extract(epoch from clock_timestamp()) * 1000);
+end;
+$$;
+
+create or replace function beacon_private.action_field(p_action text)
+returns text language sql immutable set search_path = pg_catalog
+as $$ select case p_action when 'explore' then 'explored' when 'search' then 'searched' when 'log' then 'logUnlocked' end $$;
+
+create or replace function beacon_private.check_action(p_shared jsonb, p_room text, p_action text)
+returns void language plpgsql set search_path = pg_catalog, beacon_private
+as $$
+declare room jsonb; field text;
+begin
+    field := beacon_private.action_field(p_action);
+    if p_room is null or p_room not in ('1','2','3','4','5','6','7','7b','8','9','10') or field is null then
+        raise exception 'Invalid action or sector' using errcode = '22023';
+    end if;
+    room := p_shared #> array['vad_shared_station_state_v14', p_room];
+    if room is null or room ->> 'unlocked' is distinct from 'true'
+        or (p_room = '7b' and room ->> 'enginePowered' is distinct from 'true' and room ->> 'wardenAllow7bVis' is distinct from 'true')
+        or (p_action <> 'explore' and room ->> 'explored' is distinct from 'true')
+        or room ->> field = 'true' then
+        raise exception 'Action is unavailable or already completed' using errcode = '22023';
+    end if;
+end;
+$$;
+
+create or replace function public.beacon_request_action(p_code text, p_group integer, p_room text, p_action text, p_id uuid, p_epoch bigint)
+returns void language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+declare session_row beacon_private.sessions%rowtype; entry jsonb; entries jsonb;
+begin
+    select * into session_row from beacon_private.sessions where join_code = p_code for update;
+    if not found or p_group is null or p_group not between 1 and 4 or session_row.groups ->> p_group::text is distinct from 'true' then
+        raise exception 'Active player group required' using errcode = '42501';
+    end if;
+    if p_epoch is distinct from session_row.reset_epoch then
+        raise exception 'Session changed; reload before requesting' using errcode = '40001';
+    end if;
+    if p_id is null then raise exception 'Request identifier required' using errcode = '22023'; end if;
+    select value into entry from jsonb_array_elements(session_row.action_requests) where value ->> 'id' = p_id::text;
+    if found then
+        if entry ->> 'group' <> p_group::text or entry ->> 'room' is distinct from p_room or entry ->> 'action' is distinct from p_action then
+            raise exception 'Request identifier already used' using errcode = '22023';
+        end if;
+        return;
+    end if;
+    perform beacon_private.check_action(session_row.shared, p_room, p_action);
+    if exists (select 1 from jsonb_array_elements(session_row.action_requests) e
+        where e ->> 'status' = 'pending' and e ->> 'room' = p_room and e ->> 'action' = p_action) then
+        raise exception 'An equivalent request is already pending' using errcode = '22023';
+    end if;
+    entries := session_row.action_requests;
+    if jsonb_array_length(entries) >= 300 then
+        select coalesce(jsonb_agg(value order by ord), '[]'::jsonb) into entries
+        from jsonb_array_elements(entries) with ordinality t(value,ord) where value ->> 'status' = 'pending';
+        if jsonb_array_length(entries) >= 300 then raise exception 'Request queue is full' using errcode = '54000'; end if;
+    end if;
+    update beacon_private.sessions set action_requests = entries || jsonb_build_array(jsonb_build_object(
+        'id', p_id, 'group', p_group, 'room', p_room, 'action', p_action,
+        'status', 'pending', 'time', extract(epoch from clock_timestamp()) * 1000))
+    where owner_id = session_row.owner_id;
+end;
+$$;
+
+create or replace function public.beacon_decide_action(p_code text, p_id uuid, p_approve boolean, p_epoch bigint)
+returns void language plpgsql security definer set search_path = pg_catalog, beacon_private
+as $$
+declare session_row beacon_private.sessions%rowtype; entry jsonb; idx integer; field text; log jsonb; message text;
+begin
+    select * into session_row from beacon_private.sessions where join_code = p_code and owner_id = auth.uid() for update;
+    if not found then raise exception 'Warden access required' using errcode = '42501'; end if;
+    if p_epoch is distinct from session_row.reset_epoch then raise exception 'Session changed; reload' using errcode = '40001'; end if;
+    if p_approve is null then raise exception 'Decision required' using errcode = '22023'; end if;
+    select value, (ord - 1)::integer into entry, idx from jsonb_array_elements(session_row.action_requests) with ordinality t(value,ord)
+        where value ->> 'id' = p_id::text;
+    if entry is null then raise exception 'Request not found' using errcode = '22023'; end if;
+    if entry ->> 'status' <> 'pending' then
+        if entry ->> 'status' = (case when p_approve then 'approved' else 'rejected' end) then return; end if;
+        raise exception 'Request already decided' using errcode = '22023';
+    end if;
+    if p_approve then
+        perform beacon_private.check_action(session_row.shared, entry ->> 'room', entry ->> 'action');
+        field := beacon_private.action_field(entry ->> 'action');
+        session_row.shared := jsonb_set(session_row.shared, array['vad_shared_station_state_v14', entry ->> 'room', field], 'true'::jsonb);
+        message := case entry ->> 'action' when 'explore' then 'Explored sector ' when 'search' then 'Searched sector ' else 'Accessed data log: sector ' end || (entry ->> 'room');
+        log := coalesce(session_row.private_data -> 'vad_session_log_v1', '[]'::jsonb) || jsonb_build_array(
+            jsonb_build_object('t', extract(epoch from clock_timestamp()) * 1000, 's', 'PLAYER', 'm', message, 'group', (entry ->> 'group')::integer));
+        if jsonb_array_length(log) > 300 then log := log - 0; end if;
+        session_row.private_data := jsonb_set(session_row.private_data, '{vad_session_log_v1}', log, true);
+    end if;
+    session_row.action_requests := jsonb_set(session_row.action_requests, array[idx::text, 'status'],
+        to_jsonb(case when p_approve then 'approved' else 'rejected' end));
+    update beacon_private.sessions set shared = session_row.shared, private_data = session_row.private_data,
+        action_requests = session_row.action_requests where owner_id = session_row.owner_id;
 end;
 $$;
 
@@ -185,7 +281,7 @@ begin
                     or jsonb_typeof(field_entry.value) <> 'boolean' then
                     raise exception 'Invalid room field' using errcode = '22023';
                 end if;
-                if not is_owner and (field_entry.key like 'warden%'
+                if not is_owner and (field_entry.key in ('explored','searched','logUnlocked') or field_entry.key like 'warden%'
                     or field_entry.value <> 'true'::jsonb
                     or (field_entry.key = 'engineCollected' and room_entry.key <> '8')
                     or (field_entry.key = 'enginePowered' and room_entry.key <> '7b')) then
@@ -349,7 +445,7 @@ begin
         end loop;
         new_private := jsonb_set(new_private, array['vad_session_log_v1'], p_data -> 'vad_session_log_v1', true);
     end if;
-    update beacon_private.sessions set shared = new_shared, private_data = new_private, reset_epoch = reset_epoch + 1
+    update beacon_private.sessions set shared = new_shared, private_data = new_private, action_requests = '[]'::jsonb, reset_epoch = reset_epoch + 1
     where join_code = p_code and owner_id = auth.uid();
 end;
 $$;
@@ -368,7 +464,7 @@ begin
         private_data = (private_data - 'vad_session_log_v1') || jsonb_build_object('vad_session_log_v1',
             jsonb_build_array(jsonb_build_object('t', extract(epoch from clock_timestamp()) * 1000,
                 's', 'WARDEN', 'm', 'Station reset'))),
-        reset_epoch = reset_epoch + 1
+        action_requests = '[]'::jsonb, reset_epoch = reset_epoch + 1
     where join_code = p_code and owner_id = auth.uid();
     if not found then raise exception 'Warden access required' using errcode = '42501'; end if;
 end;
@@ -385,6 +481,8 @@ revoke all on function public.beacon_log(text, integer, text, text, bigint, uuid
 revoke all on function public.beacon_clear_log(text, bigint) from public, anon;
 revoke all on function public.beacon_restore(text, jsonb) from public, anon;
 revoke all on function public.beacon_reset(text) from public, anon;
+revoke all on function public.beacon_request_action(text, integer, text, text, uuid, bigint) from public;
+revoke all on function public.beacon_decide_action(text, uuid, boolean, bigint) from public, anon;
 grant execute on function public.beacon_open_warden() to authenticated;
 grant execute on function public.beacon_join_player(text) to anon, authenticated;
 grant execute on function public.beacon_read_session(text, integer) to anon, authenticated;
@@ -395,3 +493,5 @@ grant execute on function public.beacon_log(text, integer, text, text, bigint, u
 grant execute on function public.beacon_clear_log(text, bigint) to authenticated;
 grant execute on function public.beacon_restore(text, jsonb) to authenticated;
 grant execute on function public.beacon_reset(text) to authenticated;
+grant execute on function public.beacon_request_action(text, integer, text, text, uuid, bigint) to anon, authenticated;
+grant execute on function public.beacon_decide_action(text, uuid, boolean, bigint) to authenticated;
