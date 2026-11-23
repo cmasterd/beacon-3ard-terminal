@@ -199,6 +199,9 @@
       <button onclick="exportScenarioJSON()" class="btn-crt px-2.5 py-1.5 font-semibold" title="Export Scenario JSON">
         EXPORT JSON
       </button>
+      <button onclick="exportScenarioPackage()" class="btn-crt px-2.5 py-1.5 font-semibold" title="Export a private versioned scenario package; this does not publish a game">
+        EXPORT GAME PACKAGE
+      </button>
       <label class="btn-crt px-2.5 py-1.5 font-semibold cursor-pointer" title="Import Scenario JSON">
         IMPORT
         <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importScenarioJSON(event)" />
@@ -592,6 +595,7 @@
 
   <script src="builder-validation.js"></script>
   <script src="builder-storage.js"></script>
+  <script src="scenario-package.js"></script>
   <script>
     // =========================================================================
     // DEFAULT SCENARIO DATA: INCIDENT AT BEACON 3A-R3D
@@ -2110,6 +2114,23 @@
       a.click();
       a.remove();
       logWardenEvent("Exported scenario JSON file.", "cyan");
+    }
+
+    function exportScenarioPackage() {
+      try {
+        const packageData = SCENARIO_PACKAGE.makePackage(scenario);
+        if (!confirm("This private game package includes keypad codes, hidden content and the current simulation state. Keep it private. This does not publish a playable game. Export it?")) return;
+        const a = document.createElement("a");
+        a.href = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(packageData, null, 2));
+        const slug = packageData.catalog.title.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+        a.download = `${slug}_game_package.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        logWardenEvent("Exported private game package.", "cyan");
+      } catch (error) {
+        projectStorage.error("Game package export failed: " + error.message);
+      }
     }
 
     function importScenarioJSON(event) {

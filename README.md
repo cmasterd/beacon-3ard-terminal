@@ -16,6 +16,12 @@ The Shop Terminal is available under **Shared Terminals** and from the Beacon ga
 
 Invalid imports are rejected without replacing the project. Storage errors and invalid saved data are shown on the page; a damaged saved project is not overwritten automatically. A valid imported backup can replace it.
 
+### Preparing a scenario package
+
+Scenario Builder's **Export Game Package** creates a versioned JSON package for the future publishing workflow. It does not publish a game or create a playable session. The `catalog` contains the public title and an initially empty description; the `definition` contains the private scenario, including sector details, items, logs, keypad codes and starting state. Treat the entire exported file as private and do not share it with players. Existing **Export JSON** remains the builder's backup format; game packages cannot currently be imported into the builder.
+
+The package records the current simulation state as the starting state, including party and hunter locations, inventory, clocks and flags. Reset or adjust the simulation before exporting if necessary. It uses format `vad-scenario`, version `1`; only explicitly supported fields are included. The eventual server must keep the definition private and reveal sector details, items and logs through approval-controlled player views. The package is a foundation, not a generic runtime: Beacon-specific simulation mechanics have not yet been generalized.
+
 ### Game-aware foundation (in development)
 
 `supabase/game_foundation.sql` is an experimental, additive database migration intended to be run **after** `supabase/schema.sql`. It registers Beacon as a game and links existing and newly created Beacon sessions to game-session records without copying or changing their codes, credentials, progress, notes, ships or requests. It also provides private storage for versioned game definitions, separate session state and group inventories, and a model that can associate multiple named sessions with a game. Public catalog results include only published game metadata, not definitions; a Warden's session list contains only that account's session metadata.
