@@ -34,8 +34,13 @@
         drafts = result;
         const selected = select.value;
         select.replaceChildren(new Option('NEW DRAFT', ''));
-        for (const draft of drafts) select.add(new Option(`${draft.title} — version ${draft.version}`, draft.id));
+        for (const draft of drafts) {
+            const option = new Option(`${draft.title} — version ${draft.version}`, draft.id);
+            option.dataset.versionId = draft.version_id;
+            select.add(option);
+        }
         if (drafts.some(draft => draft.id === selected)) select.value = selected;
+        select.dispatchEvent(new Event('change'));
     }
 
     async function reload() {
@@ -67,6 +72,7 @@
             try {
                 await list();
                 select.value = savedId;
+                select.dispatchEvent(new Event('change'));
                 status.textContent = `Private draft saved as version ${result.version}. It is not published.`;
             } catch (error) {
                 status.textContent = `Version ${result.version} saved, but the draft list could not be refreshed: ${error.message}`;

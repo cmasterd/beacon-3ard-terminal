@@ -2140,7 +2140,8 @@
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const parsed = JSON.parse(e.target.result);
+          const imported = JSON.parse(e.target.result);
+          const parsed = imported && imported.definition ? SCENARIO_PACKAGE.readPackage(imported) : imported;
           BUILDER_VALIDATION.scenario(parsed);
           if (!projectStorage.confirmImport()) return;
           scenario = parsed;

@@ -33,8 +33,22 @@
             <button type="button" id="draft-retry" hidden>RETRY UNCERTAIN SAVE</button>
             <button type="button" id="draft-discard" hidden>DISCARD RETRY</button>
         </section>
+        <section>
+            <h2>PREPARE A PRIVATE SESSION</h2>
+            <p>Select a draft above and name the session. This stores a separate starting state pinned to the selected draft version. It is not playable and cannot be shared with players yet.</p>
+            <label for="session-name">Session name</label>
+            <input id="session-name" type="text" maxlength="120">
+            <button type="button" id="session-create">PREPARE SESSION</button>
+            <button type="button" id="session-retry" hidden>RETRY UNCERTAIN PREPARATION</button>
+            <button type="button" id="session-discard" hidden>DISCARD RETRY</button>
+            <p id="session-status" role="status" aria-live="polite"></p>
+            <h3>PREPARED SESSIONS — NOT PLAYABLE</h3>
+            <button type="button" id="session-refresh">REFRESH SESSIONS</button>
+            <ul id="session-list"></ul>
+        </section>
     </main>
     <script src="online.js"></script>
     <script src="scenario-drafts.js"></script>
+    <script src="scenario-sessions.js"></script>
 </body>
 </html>

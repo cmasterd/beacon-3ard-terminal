@@ -215,15 +215,116 @@ begin
 end;
 $$;
 
+-- A private preparation record pins an immutable draft version. No player
+-- access is provided until a scenario runtime and safe projections exist.
+create or replace function public.game_prepare_session(p_session_id uuid, p_game_id uuid, p_version_id uuid, p_name text)
+returns jsonb language plpgsql security definer
+set search_path = pg_catalog, beacon_private
+as $$
+declare
+    existing beacon_private.game_sessions%rowtype;
+    package jsonb;
+    initial_state jsonb;
+    nodes jsonb;
+    start_room text;
+    hunter_room text;
+    session_name text;
+begin
+    if auth.uid() is null then raise exception 'Warden login required' using errcode = '42501'; end if;
+    if p_session_id is null or p_game_id is null or p_version_id is null or p_name is null
+        or length(btrim(p_name)) not between 1 and 120 then
+        raise exception 'Invalid session details' using errcode = '22023';
+    end if;
+    session_name := btrim(p_name);
+    select * into existing from beacon_private.game_sessions where id = p_session_id;
+    if found then
+        if existing.owner_id is distinct from auth.uid() or existing.game_id is distinct from p_game_id
+            or existing.version_id is distinct from p_version_id or existing.name is distinct from session_name then
+            raise exception 'Session identifier already used' using errcode = '22023';
+        end if;
+        return jsonb_build_object('session_id', p_session_id, 'game_id', p_game_id, 'version_id', p_version_id);
+    end if;
+    select v.definition into package from beacon_private.game_versions v
+        join beacon_private.games g on g.id = v.game_id
+        where g.id = p_game_id and v.id = p_version_id and g.owner_id = auth.uid()
+            and g.engine = 'scenario' and not g.published;
+    if not found then raise exception 'Private draft version not found' using errcode = '42501'; end if;
+    initial_state := package #> '{definition,initialState}';
+    nodes := package #> '{definition,nodes}';
+    start_room := initial_state ->> 'partyNodeId';
+    hunter_room := initial_state ->> 'hunterNodeId';
+    if package #>> '{definition,format}' is distinct from 'vad-scenario'
+        or package #> '{definition,version}' is distinct from '1'::jsonb
+        or jsonb_typeof(initial_state) is distinct from 'object'
+        or jsonb_typeof(nodes) is distinct from 'array'
+        or jsonb_typeof(initial_state -> 'partyNodeId') is distinct from 'string'
+        or jsonb_typeof(initial_state -> 'hunterNodeId') is distinct from 'string'
+        or jsonb_typeof(initial_state -> 'stress') is distinct from 'number'
+        or jsonb_typeof(initial_state -> 'worldFlags') is distinct from 'object'
+        or jsonb_typeof(initial_state -> 'clocks') is distinct from 'array'
+        or jsonb_typeof(initial_state -> 'inventory') is distinct from 'array' then
+        raise exception 'Draft is missing required starting state' using errcode = '22023';
+    end if;
+    if exists (select 1 from jsonb_array_elements(nodes) n
+        where jsonb_typeof(n) is distinct from 'object'
+            or jsonb_typeof(n -> 'id') is distinct from 'string'
+            or n ->> 'id' !~ '^[a-zA-Z0-9_-]+$')
+        or (select count(*) from jsonb_array_elements(nodes)) <>
+           (select count(distinct n ->> 'id') from jsonb_array_elements(nodes) n)
+        or not exists (select 1 from jsonb_array_elements(nodes) n where n ->> 'id' = start_room)
+        or not exists (select 1 from jsonb_array_elements(nodes) n where n ->> 'id' = hunter_room) then
+        raise exception 'Draft has invalid starting rooms' using errcode = '22023';
+    end if;
+    insert into beacon_private.game_sessions (id, owner_id, game_id, name, version_id)
+        values (p_session_id, auth.uid(), p_game_id, session_name, p_version_id)
+        on conflict (id) do nothing;
+    if not found then
+        select * into existing from beacon_private.game_sessions where id = p_session_id;
+        if existing.owner_id is distinct from auth.uid() or existing.game_id is distinct from p_game_id
+            or existing.version_id is distinct from p_version_id or existing.name is distinct from session_name then
+            raise exception 'Session identifier already used' using errcode = '22023';
+        end if;
+        return jsonb_build_object('session_id', p_session_id, 'game_id', p_game_id, 'version_id', p_version_id);
+    end if;
+    insert into beacon_private.game_session_state (session_id, world_state)
+        values (p_session_id, initial_state - 'partyNodeId' - 'inventory');
+    insert into beacon_private.game_session_groups (session_id, group_number, enabled, location_id, inventory)
+        select p_session_id, n, n = 1, case when n = 1 then start_room end,
+            case when n = 1 then initial_state -> 'inventory' else '[]'::jsonb end
+        from generate_series(1, 4) n;
+    return jsonb_build_object('session_id', p_session_id, 'game_id', p_game_id, 'version_id', p_version_id);
+end;
+$$;
+
+create or replace function public.game_list_my_prepared_sessions()
+returns jsonb language plpgsql stable security definer
+set search_path = pg_catalog, beacon_private
+as $$
+begin
+    if auth.uid() is null then raise exception 'Warden login required' using errcode = '42501'; end if;
+    return coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'name', s.name,
+        'game_id', g.id, 'game_title', v.definition #>> '{catalog,title}',
+        'version', v.version, 'version_id', v.id) order by s.created_at, s.id)
+        from beacon_private.game_sessions s
+        join beacon_private.games g on g.id = s.game_id
+        join beacon_private.game_versions v on v.id = s.version_id and v.game_id = s.game_id
+        where s.owner_id = auth.uid() and s.legacy_owner_id is null and g.engine = 'scenario'), '[]'::jsonb);
+end;
+$$;
+
 revoke all on function public.game_list_published() from public;
 revoke all on function public.game_list_my_sessions() from public, anon;
 revoke all on function public.game_save_draft(uuid, uuid, integer, jsonb) from public, anon;
 revoke all on function public.game_list_my_drafts() from public, anon;
 revoke all on function public.game_read_draft(uuid) from public, anon;
+revoke all on function public.game_prepare_session(uuid, uuid, uuid, text) from public, anon;
+revoke all on function public.game_list_my_prepared_sessions() from public, anon;
 grant execute on function public.game_list_published() to anon, authenticated;
 grant execute on function public.game_list_my_sessions() to authenticated;
 grant execute on function public.game_save_draft(uuid, uuid, integer, jsonb) to authenticated;
 grant execute on function public.game_list_my_drafts() to authenticated;
 grant execute on function public.game_read_draft(uuid) to authenticated;
+grant execute on function public.game_prepare_session(uuid, uuid, uuid, text) to authenticated;
+grant execute on function public.game_list_my_prepared_sessions() to authenticated;
 
 commit;
